@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trackro · Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+<div class="container">
+
+  <div id="app-content" style="display:none">
+    <header class="app-header">
+      <h1>Trackro</h1>
+      <p>Weight · Exercise · Macros</p>
+    </header>
+
+    <nav id="main-nav" style="display:flex; gap:6px; margin-bottom:2rem; flex-wrap:wrap;"></nav>
+
+    <div class="stat-bar" id="dStats"></div>
+
+    <div class="card">
+      <h2>Weight trend (last 60 days)</h2>
+      <div class="chart-wrap">
+        <canvas id="dWeightChart"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Today vs macro targets</h2>
+      <div id="dMacros"><div class="empty-note">Loading...</div></div>
+    </div>
+
+    <div class="card">
+      <h2>Weekly exercise volume</h2>
+      <div class="chart-wrap">
+        <canvas id="dExerciseChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="js/config.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/gate.js"></script>
+</body>
+</html>

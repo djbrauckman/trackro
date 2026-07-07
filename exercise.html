@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trackro · Exercise</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+<div class="container">
+
+  <div id="app-content" style="display:none">
+    <header class="app-header">
+      <h1>Trackro</h1>
+      <p>Weight · Exercise · Macros</p>
+    </header>
+
+    <nav id="main-nav" style="display:flex; gap:6px; margin-bottom:2rem; flex-wrap:wrap;"></nav>
+
+    <div class="card">
+      <h2>Log exercise</h2>
+      <div class="input-row">
+        <div>
+          <div class="label">Date</div>
+          <input type="date" id="eDate" />
+        </div>
+        <div>
+          <div class="label">Type</div>
+          <select id="eCategory">
+            <option value="cardio">Cardio</option>
+            <option value="lifting">Lifting</option>
+            <option value="core">Core</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-bottom:16px">
+        <div class="label">Title</div>
+        <input type="text" id="eName" placeholder="e.g. Morning run, Push day" />
+      </div>
+      <div class="input-row-3">
+        <div>
+          <div class="label">Duration (mm:ss)</div>
+          <input type="text" id="eDuration" placeholder="8:30" />
+        </div>
+        <div>
+          <div class="label">Calories burned</div>
+          <input type="number" id="eCalories" step="1" />
+        </div>
+      </div>
+
+      <div id="eCardioFields">
+        <div class="input-row">
+          <div>
+            <div class="label">Distance (mi)</div>
+            <input type="number" id="eDistance" step="0.01" />
+          </div>
+          <div>
+            <div class="label">Pace (min/mi)</div>
+            <input type="text" id="ePace" placeholder="auto" />
+          </div>
+        </div>
+      </div>
+
+      <div id="eLiftFields" style="display:none">
+        <div id="eExercises"></div>
+        <div class="btn-row" style="margin-top:0; margin-bottom:16px;">
+          <button type="button" class="btn-secondary" id="eAddExercise">+ Add exercise</button>
+        </div>
+      </div>
+
+      <div style="margin-bottom:16px">
+        <div class="label">Notes (optional)</div>
+        <input type="text" id="eNotes" />
+      </div>
+      <div class="btn-row">
+        <button class="btn-primary" id="eSubmit">Save entry</button>
+      </div>
+      <div class="lock-error" id="eError"></div>
+    </div>
+
+    <div class="card">
+      <h2>Weekly volume (sessions per week)</h2>
+      <div class="chart-wrap">
+        <canvas id="eChart"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>History</h2>
+      <div id="eHistory"><div class="empty-note">Loading...</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="js/config.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/exercise.js"></script>
+<script src="js/gate.js"></script>
+</body>
+</html>

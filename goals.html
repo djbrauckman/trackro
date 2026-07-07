@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trackro · Goals</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+<div class="container">
+
+  <div id="app-content" style="display:none">
+    <header class="app-header">
+      <h1>Trackro</h1>
+      <p>Weight · Exercise · Macros</p>
+    </header>
+
+    <nav id="main-nav" style="display:flex; gap:6px; margin-bottom:2rem; flex-wrap:wrap;"></nav>
+
+    <div class="card">
+      <h2>Targets</h2>
+      <div class="input-row">
+        <div>
+          <div class="label">Target weight (lbs)</div>
+          <input type="number" id="gWeight" step="0.1" />
+        </div>
+        <div>
+          <div class="label">Target calories</div>
+          <input type="number" id="gCalories" step="1" />
+        </div>
+      </div>
+      <div class="input-row-3">
+        <div>
+          <div class="label">Target protein (g)</div>
+          <input type="number" id="gProtein" step="1" />
+        </div>
+        <div>
+          <div class="label">Target carbs (g)</div>
+          <input type="number" id="gCarbs" step="1" />
+        </div>
+        <div>
+          <div class="label">Target fat (g)</div>
+          <input type="number" id="gFat" step="1" />
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-primary" id="gSubmit">Save targets</button>
+      </div>
+      <div class="lock-error" id="gError"></div>
+      <div class="lock-error" id="gSuccess" style="color: var(--teal)"></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/goals.js"></script>
+<script src="js/gate.js"></script>
+</body>
+</html>

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trackro · Macros</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+<div class="container">
+
+  <div id="app-content" style="display:none">
+    <header class="app-header">
+      <h1>Trackro</h1>
+      <p>Weight · Exercise · Macros</p>
+    </header>
+
+    <nav id="main-nav" style="display:flex; gap:6px; margin-bottom:2rem; flex-wrap:wrap;"></nav>
+
+    <div class="card">
+      <h2>Log food</h2>
+      <div class="input-row">
+        <div>
+          <div class="label">Date</div>
+          <input type="date" id="mDate" />
+        </div>
+        <div>
+          <div class="label">Meal</div>
+          <select id="mMeal">
+            <option>Breakfast</option>
+            <option>Lunch</option>
+            <option>Dinner</option>
+            <option>Snack</option>
+          </select>
+        </div>
+      </div>
+      <div id="mIngredients"></div>
+      <datalist id="commonFoodsList"></datalist>
+
+      <div class="btn-row" style="margin-top:0; margin-bottom:16px;">
+        <button type="button" class="btn-secondary" id="mAddIngredient">+ Add ingredient</button>
+      </div>
+      <div class="empty-note" style="margin-top:-8px; margin-bottom:16px;">
+        Enter macros per unit (e.g. per egg) — Qty multiplies them. Add multiple ingredients (e.g. for a sandwich) and they'll be summed into one entry.
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-primary" id="mSubmit">Save entry</button>
+      </div>
+      <div class="lock-error" id="mError"></div>
+    </div>
+
+    <div class="card">
+      <h2>Today vs targets</h2>
+      <div id="mToday"><div class="empty-note">Loading...</div></div>
+    </div>
+
+    <div class="card">
+      <h2>Calorie trend (last 30 days)</h2>
+      <div class="chart-wrap">
+        <canvas id="mChart"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>History</h2>
+      <div id="mHistory"><div class="empty-note">Loading...</div></div>
+    </div>
+
+    <div class="card">
+      <h2>Common foods</h2>
+      <div class="empty-note" style="margin-top:-4px;">Save foods you eat often (macros per unit), then pick them from the Food field above to auto-fill.</div>
+      <div style="margin-bottom:16px">
+        <div class="label">Name</div>
+        <input type="text" id="cfName" placeholder="e.g. Egg (1 large)" />
+      </div>
+      <div class="input-row-3">
+        <div>
+          <div class="label">Calories</div>
+          <input type="number" id="cfCalories" step="1" />
+        </div>
+        <div>
+          <div class="label">Protein (g)</div>
+          <input type="number" id="cfProtein" step="1" />
+        </div>
+        <div>
+          <div class="label">Carbs (g)</div>
+          <input type="number" id="cfCarbs" step="1" />
+        </div>
+      </div>
+      <div style="max-width: calc(33.33% - 10px); margin-bottom:16px">
+        <div class="label">Fat (g)</div>
+        <input type="number" id="cfFat" step="1" />
+      </div>
+      <div class="btn-row" style="margin-top:0">
+        <button class="btn-secondary" id="cfAdd">Add to dictionary</button>
+      </div>
+      <div class="lock-error" id="cfError"></div>
+      <div id="cfList" style="margin-top:16px"><div class="empty-note">Loading...</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="js/config.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/macros.js"></script>
+<script src="js/gate.js"></script>
+</body>
+</html>
