@@ -210,6 +210,16 @@ table.history-table td {
   color: var(--text);
 }
 table.history-table tr:last-child td { border-bottom: none; }
+table.history-table tr.group-start td { border-top: 2px solid var(--border-mid); }
+table.history-table tr.group-start:first-child td { border-top: none; }
+.table-scroll { overflow-x: auto; }
+
+.history-subhead {
+  font-size: 12px; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin: 20px 0 8px;
+}
+.history-subhead:first-child { margin-top: 0; }
 
 /* ── Chart containers ── */
 .chart-wrap { position: relative; height: 220px; margin-bottom: 4px; }

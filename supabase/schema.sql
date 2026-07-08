@@ -32,6 +32,19 @@ create table if not exists exercise_entries (
 alter table exercise_entries add column if not exists pace_sec_per_mi numeric;
 alter table exercise_entries add column if not exists details text;
 
+-- One row per exercise within a lifting/core workout (exercise_entries is the
+-- workout header — date, title, duration, calories, notes).
+create table if not exists exercise_items (
+  id uuid primary key default gen_random_uuid(),
+  exercise_entry_id uuid not null references exercise_entries(id) on delete cascade,
+  position integer not null default 0,
+  name text not null,
+  sets integer,
+  reps integer,
+  load_lbs numeric,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists macro_entries (
   id uuid primary key default gen_random_uuid(),
   logged_at date not null,
@@ -69,6 +82,7 @@ insert into goals (id) values (1) on conflict (id) do nothing;
 
 create index if not exists weight_entries_logged_at_idx on weight_entries (logged_at desc);
 create index if not exists exercise_entries_logged_at_idx on exercise_entries (logged_at desc);
+create index if not exists exercise_items_entry_idx on exercise_items (exercise_entry_id);
 create index if not exists macro_entries_logged_at_idx on macro_entries (logged_at desc);
 create index if not exists common_foods_name_idx on common_foods (name);
 
@@ -76,12 +90,14 @@ create index if not exists common_foods_name_idx on common_foods (name);
 -- not per-row auth. See README for the tradeoffs of this approach.
 alter table weight_entries enable row level security;
 alter table exercise_entries enable row level security;
+alter table exercise_items enable row level security;
 alter table macro_entries enable row level security;
 alter table common_foods enable row level security;
 alter table goals enable row level security;
 
 create policy "anon full access" on weight_entries for all using (true) with check (true);
 create policy "anon full access" on exercise_entries for all using (true) with check (true);
+create policy "anon full access" on exercise_items for all using (true) with check (true);
 create policy "anon full access" on macro_entries for all using (true) with check (true);
 create policy "anon full access" on common_foods for all using (true) with check (true);
 create policy "anon full access" on goals for all using (true) with check (true);

@@ -4,7 +4,7 @@
  * all three tables plus goals.
  */
 let dWeightChartInstance = null;
-let dExerciseChartInstance = null;
+const EXERCISE_CATEGORIES = ['cardio', 'lifting', 'core'];
 
 document.addEventListener('DOMContentLoaded', () => {
   initNav('dashboard');
@@ -29,7 +29,7 @@ async function loadDashboard() {
   renderStats(weights || [], exercises || [], macros || [], goals);
   renderWeightChart(weights || []);
   renderTodayMacros(macros || [], goals);
-  renderExerciseChart(exercises || []);
+  renderExerciseCounts(exercises || []);
 }
 
 function renderStats(weights, exercises, macros, goals) {
@@ -123,37 +123,16 @@ function renderTodayMacros(rows, goals) {
   }).join('') || '<div class="empty-note">Set targets on the Goals page.</div>';
 }
 
-function renderExerciseChart(rows) {
-  const counts = {};
+function renderExerciseCounts(rows) {
+  const counts = { cardio: 0, lifting: 0, core: 0 };
   rows.forEach(r => {
-    const wk = weekStartISO(r.logged_at);
-    counts[wk] = (counts[wk] || 0) + 1;
+    if (counts[r.category] != null) counts[r.category]++;
   });
-  const weeks = Object.keys(counts).sort();
-  const labels = weeks.map(formatDateShort);
-  const values = weeks.map(w => counts[w]);
 
-  const ctx = document.getElementById('dExerciseChart').getContext('2d');
-  if (dExerciseChartInstance) dExerciseChartInstance.destroy();
-  dExerciseChartInstance = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Sessions',
-        data: values,
-        backgroundColor: '#1B5EAB',
-        borderRadius: 4,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } } },
-        x: { ticks: { font: { size: 10 } } },
-      },
-    },
-  });
+  const tiles = EXERCISE_CATEGORIES.map(cat => [cat.charAt(0).toUpperCase() + cat.slice(1), counts[cat]]);
+  tiles.push(['Total', rows.length]);
+
+  document.getElementById('dExerciseCounts').innerHTML = tiles.map(([label, value]) => `
+    <div class="stat-chip"><span>${value}</span>${label}</div>
+  `).join('');
 }

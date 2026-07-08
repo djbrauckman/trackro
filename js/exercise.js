@@ -1,9 +1,7 @@
 /**
  * exercise.js
- * Logic for exercise.html: log entries, render weekly volume chart + history table.
+ * Logic for exercise.html: log entries, render type-count tiles + history table.
  */
-let eChartInstance = null;
-
 document.addEventListener('DOMContentLoaded', () => {
   initNav('exercise');
   document.getElementById('eDate').value = todayISO();
@@ -133,6 +131,7 @@ async function submitExercise() {
     const v = document.getElementById(id).value;
     return v === '' ? null : parseFloat(v);
   };
+  const numOrNullFromEl = (el) => (el.value === '' ? null : parseFloat(el.value));
 
   const duration_min = parseMinutesSeconds(document.getElementById('eDuration').value);
 
@@ -151,6 +150,8 @@ async function submitExercise() {
     details: null,
   };
 
+  let items = [];
+
   if (category === 'cardio') {
     const distance_mi = numOrNull('eDistance');
     entry.distance_mi = distance_mi;
@@ -160,30 +161,38 @@ async function submitExercise() {
       ? paceMin * 60
       : (duration_min && distance_mi ? (duration_min / distance_mi) * 60 : null);
   } else {
-    const items = [];
-    document.querySelectorAll('#eExercises .repeatable-row').forEach(row => {
+    document.querySelectorAll('#eExercises .repeatable-row').forEach((row, position) => {
       const name = row.querySelector('.ex-name').value.trim();
       if (!name) return;
-      const sets = row.querySelector('.ex-sets').value;
-      const reps = row.querySelector('.ex-reps').value;
-      const load = row.querySelector('.ex-load').value;
-      let line = name;
-      if (sets !== '' || reps !== '') line += `: ${sets || '-'}x${reps || '-'}`;
-      if (load !== '') line += ` @ ${load} lbs`;
-      items.push(line);
+      items.push({
+        position,
+        name,
+        sets: numOrNullFromEl(row.querySelector('.ex-sets')),
+        reps: numOrNullFromEl(row.querySelector('.ex-reps')),
+        load_lbs: numOrNullFromEl(row.querySelector('.ex-load')),
+      });
     });
 
     if (!items.length) {
       errorEl.textContent = 'Add at least one exercise.';
       return;
     }
-    entry.details = items.join('\n');
   }
 
-  const { error } = await supabaseClient.from('exercise_entries').insert(entry);
+  const { data: inserted, error } = await supabaseClient.from('exercise_entries').insert(entry).select().single();
   if (error) {
     errorEl.textContent = error.message;
     return;
+  }
+
+  if (items.length) {
+    const itemRows = items.map(it => ({ ...it, exercise_entry_id: inserted.id }));
+    const { error: itemsError } = await supabaseClient.from('exercise_items').insert(itemRows);
+    if (itemsError) {
+      errorEl.textContent = itemsError.message;
+      await supabaseClient.from('exercise_entries').delete().eq('id', inserted.id);
+      return;
+    }
   }
 
   ['eName', 'eDuration', 'eDistance', 'ePace', 'eCalories', 'eNotes'].forEach(id => {
@@ -199,7 +208,7 @@ async function deleteExercise(id) {
 }
 
 async function loadExerciseData() {
-  const { data, error } = await supabaseClient
+  const { data: entries, error } = await supabaseClient
     .from('exercise_entries')
     .select('*')
     .gte('logged_at', daysAgoISO(90))
@@ -211,86 +220,128 @@ async function loadExerciseData() {
     return;
   }
 
-  renderExerciseChart(data);
-  renderExerciseHistory(data);
+  const strengthIds = entries.filter(e => e.category !== 'cardio').map(e => e.id);
+  let items = [];
+  if (strengthIds.length) {
+    const { data: itemRows } = await supabaseClient
+      .from('exercise_items')
+      .select('*')
+      .in('exercise_entry_id', strengthIds)
+      .order('position', { ascending: true });
+    items = itemRows || [];
+  }
+
+  renderExerciseCounts(entries);
+  renderExerciseHistory(entries, items);
 }
 
-function weekStartISO(isoDate) {
-  const d = new Date(isoDate + 'T00:00:00');
-  const day = (d.getDay() + 6) % 7; // 0 = Monday
-  d.setDate(d.getDate() - day);
-  return d.toLocaleDateString('en-CA');
-}
+const EXERCISE_CATEGORIES = ['cardio', 'lifting', 'core'];
 
-function renderExerciseChart(rows) {
-  const counts = {};
+function renderExerciseCounts(rows) {
+  const counts = { cardio: 0, lifting: 0, core: 0 };
   rows.forEach(r => {
-    const wk = weekStartISO(r.logged_at);
-    counts[wk] = (counts[wk] || 0) + 1;
+    if (counts[r.category] != null) counts[r.category]++;
   });
-  const weeks = Object.keys(counts).sort();
-  const labels = weeks.map(formatDateShort);
-  const values = weeks.map(w => counts[w]);
 
-  const ctx = document.getElementById('eChart').getContext('2d');
-  if (eChartInstance) eChartInstance.destroy();
-  eChartInstance = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Sessions',
-        data: values,
-        backgroundColor: '#1B5EAB',
-        borderRadius: 4,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } } },
-        x: { ticks: { font: { size: 10 } } },
-      },
-    },
-  });
+  const tiles = EXERCISE_CATEGORIES.map(cat => [cat.charAt(0).toUpperCase() + cat.slice(1), counts[cat]]);
+  tiles.push(['Total', rows.length]);
+
+  document.getElementById('eCounts').innerHTML = tiles.map(([label, value]) => `
+    <div class="stat-chip"><span>${value}</span>${label}</div>
+  `).join('');
 }
 
-function renderExerciseHistory(rows) {
+function renderExerciseHistory(rows, items) {
   const historyEl = document.getElementById('eHistory');
   if (!rows.length) {
     historyEl.innerHTML = '<div class="empty-note">No entries yet.</div>';
     return;
   }
 
-  const details = (r) => {
-    const parts = [];
-    if (r.duration_min) parts.push(`${formatMinutesSeconds(r.duration_min)} min`);
-    if (r.distance_mi) parts.push(`${r.distance_mi} mi`);
-    if (r.pace_sec_per_mi) parts.push(`${formatMinutesSeconds(r.pace_sec_per_mi / 60)}/mi`);
-    if (r.calories_burned) parts.push(`${r.calories_burned} cal`);
-    if (r.sets || r.reps) parts.push(`${r.sets || '-'}x${r.reps || '-'}`);
-    if (r.load_lbs) parts.push(`${r.load_lbs} lbs`);
-    let text = parts.join(' · ');
-    if (r.details) text += (text ? ' · ' : '') + r.details.replace(/\n/g, '; ');
-    if (r.notes) text += (text ? ' · ' : '') + r.notes;
-    return escapeHtml(text);
-  };
+  const itemsByEntry = {};
+  items.forEach(it => {
+    (itemsByEntry[it.exercise_entry_id] = itemsByEntry[it.exercise_entry_id] || []).push(it);
+  });
 
-  const rowsHtml = rows.slice(0, 25).map(r => `
+  const grids = [
+    renderCardioGrid(rows.filter(r => r.category === 'cardio')),
+    renderStrengthGrid(rows.filter(r => r.category === 'lifting'), itemsByEntry, 'Lifting'),
+    renderStrengthGrid(rows.filter(r => r.category === 'core'), itemsByEntry, 'Core'),
+  ].filter(Boolean);
+
+  historyEl.innerHTML = grids.join('') || '<div class="empty-note">No entries yet.</div>';
+}
+
+function renderCardioGrid(rows) {
+  if (!rows.length) return '';
+
+  const durationCell = (r) => r.duration_min ? formatMinutesSeconds(r.duration_min) : '—';
+  const distanceCell = (r) => r.distance_mi ? `${r.distance_mi} mi` : '—';
+  const paceCell = (r) => r.pace_sec_per_mi ? `${formatMinutesSeconds(r.pace_sec_per_mi / 60)}/mi` : '—';
+  const caloriesCell = (r) => r.calories_burned ? `${r.calories_burned}` : '—';
+
+  const rowsHtml = rows.slice(0, 40).map(r => `
     <tr>
       <td>${formatDateShort(r.logged_at)}</td>
       <td>${escapeHtml(r.exercise_name)}</td>
-      <td>${details(r)}</td>
+      <td>${durationCell(r)}</td>
+      <td>${distanceCell(r)}</td>
+      <td>${paceCell(r)}</td>
+      <td>${caloriesCell(r)}</td>
+      <td>${r.notes ? escapeHtml(r.notes) : '—'}</td>
       <td><button class="btn-danger" onclick="deleteExercise('${r.id}')">Delete</button></td>
     </tr>
   `).join('');
 
-  historyEl.innerHTML = `
-    <table class="history-table">
-      <thead><tr><th>Date</th><th>Title</th><th>Details</th><th></th></tr></thead>
-      <tbody>${rowsHtml}</tbody>
-    </table>
+  return `
+    <h3 class="history-subhead">Cardio</h3>
+    <div class="table-scroll">
+      <table class="history-table">
+        <thead>
+          <tr><th>Date</th><th>Title</th><th>Duration</th><th>Distance</th><th>Pace</th><th>Cal</th><th>Notes</th><th></th></tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// Renders one row per exercise item; legacy entries saved before exercise_items
+// existed fall back to their old serialized `details` text as a single line.
+function renderStrengthGrid(rows, itemsByEntry, label) {
+  if (!rows.length) return '';
+
+  const rowsHtml = rows.slice(0, 40).flatMap(r => {
+    const entryItems = itemsByEntry[r.id];
+    const lines = entryItems && entryItems.length
+      ? entryItems.map(it => [it.name, it.sets, it.reps, it.load_lbs])
+      : [[r.details || '—', null, null, null]];
+
+    return lines.map(([name, sets, reps, load], idx) => `
+      <tr${idx === 0 ? ' class="group-start"' : ''}>
+        <td>${idx === 0 ? formatDateShort(r.logged_at) : ''}</td>
+        <td>${idx === 0 ? escapeHtml(r.exercise_name) : ''}</td>
+        <td>${escapeHtml(name)}</td>
+        <td>${sets ?? '—'}</td>
+        <td>${reps ?? '—'}</td>
+        <td>${load ? `${load} lbs` : '—'}</td>
+        <td>${idx === 0 ? (r.duration_min ? formatMinutesSeconds(r.duration_min) : '—') : ''}</td>
+        <td>${idx === 0 ? (r.calories_burned ? r.calories_burned : '—') : ''}</td>
+        <td>${idx === 0 ? (r.notes ? escapeHtml(r.notes) : '—') : ''}</td>
+        <td>${idx === 0 ? `<button class="btn-danger" onclick="deleteExercise('${r.id}')">Delete</button>` : ''}</td>
+      </tr>
+    `).join('');
+  }).join('');
+
+  return `
+    <h3 class="history-subhead">${escapeHtml(label)}</h3>
+    <div class="table-scroll">
+      <table class="history-table">
+        <thead>
+          <tr><th>Date</th><th>Title</th><th>Exercise</th><th>Sets</th><th>Reps</th><th>Load</th><th>Duration</th><th>Cal</th><th>Notes</th><th></th></tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>
   `;
 }
