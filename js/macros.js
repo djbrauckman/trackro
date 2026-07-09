@@ -5,6 +5,8 @@
  */
 let mChartInstance = null;
 let commonFoods = [];
+let macroRows = [];
+let editingMacroId = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   initNav('macros');
@@ -12,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
   resetIngredientRows();
 
   document.getElementById('mSubmit').addEventListener('click', submitMacro);
+  document.getElementById('mCancelEdit').addEventListener('click', cancelMacroEdit);
   document.getElementById('mAddIngredient').addEventListener('click', addIngredientRow);
   document.getElementById('mIngredients').addEventListener('click', (e) => {
     if (e.target.classList.contains('ing-remove')) {
@@ -144,14 +147,58 @@ async function submitMacro() {
     ...totals,
   };
 
-  const { error } = await supabaseClient.from('macro_entries').insert(entry);
+  const { error } = editingMacroId
+    ? await supabaseClient.from('macro_entries').update(entry).eq('id', editingMacroId)
+    : await supabaseClient.from('macro_entries').insert(entry);
   if (error) {
     errorEl.textContent = error.message;
     return;
   }
 
+  editingMacroId = null;
+  setMacroFormMode('add');
   resetIngredientRows();
   loadMacroData();
+}
+
+function setMacroFormMode(mode) {
+  document.getElementById('mSubmit').textContent = mode === 'edit' ? 'Update entry' : 'Save entry';
+  document.getElementById('mCancelEdit').style.display = mode === 'edit' ? '' : 'none';
+}
+
+// Only the combined totals are stored (not the original ingredient breakdown),
+// so editing repopulates a single row with the entry's aggregate values.
+function editMacro(id) {
+  const r = macroRows.find(x => x.id === id);
+  if (!r) return;
+
+  editingMacroId = id;
+
+  document.getElementById('mDate').value = r.logged_at;
+  document.getElementById('mMeal').value = r.meal_name;
+
+  const container = document.getElementById('mIngredients');
+  container.innerHTML = '';
+  const row = ingredientRowEl();
+  row.querySelector('.ing-food').value = r.food_name;
+  row.querySelector('.ing-qty').value = 1;
+  row.querySelector('.ing-cal').value = r.calories;
+  row.querySelector('.ing-protein').value = r.protein_g;
+  row.querySelector('.ing-carbs').value = r.carbs_g;
+  row.querySelector('.ing-fat').value = r.fat_g;
+  container.appendChild(row);
+  updateIngredientRemoveButtons();
+
+  setMacroFormMode('edit');
+  document.getElementById('mDate').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function cancelMacroEdit() {
+  editingMacroId = null;
+  document.getElementById('mDate').value = todayISO();
+  document.getElementById('mMeal').value = 'Breakfast';
+  resetIngredientRows();
+  setMacroFormMode('add');
 }
 
 async function deleteMacro(id) {
@@ -248,6 +295,8 @@ async function loadMacroData() {
     return;
   }
 
+  macroRows = recent;
+
   renderTodayProgress(recent, goals);
   renderCalorieChart(recent);
   renderMacroHistory(recent);
@@ -334,7 +383,12 @@ function renderMacroHistory(rows) {
       <td>${escapeHtml(r.meal_name)}</td>
       <td>${escapeHtml(r.food_name)}</td>
       <td>${r.calories} cal · ${r.protein_g}p / ${r.carbs_g}c / ${r.fat_g}f</td>
-      <td><button class="btn-danger" onclick="deleteMacro('${r.id}')">Delete</button></td>
+      <td>
+        <div class="row-actions">
+          <button class="btn-secondary" onclick="editMacro('${r.id}')">Edit</button>
+          <button class="btn-danger" onclick="deleteMacro('${r.id}')">Delete</button>
+        </div>
+      </td>
     </tr>
   `).join('');
 

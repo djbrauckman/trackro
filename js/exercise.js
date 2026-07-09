@@ -2,6 +2,10 @@
  * exercise.js
  * Logic for exercise.html: log entries, render type-count tiles + history table.
  */
+let editingExerciseId = null;
+let exerciseRows = [];
+let exerciseItemsByEntry = {};
+
 document.addEventListener('DOMContentLoaded', () => {
   initNav('exercise');
   document.getElementById('eDate').value = todayISO();
@@ -10,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('eCategory').addEventListener('change', updateCategoryFields);
   document.getElementById('eSubmit').addEventListener('click', submitExercise);
+  document.getElementById('eCancelEdit').addEventListener('click', cancelExerciseEdit);
   document.getElementById('eAddExercise').addEventListener('click', addExerciseRow);
   document.getElementById('eExercises').addEventListener('click', (e) => {
     if (e.target.classList.contains('ex-remove')) {
@@ -21,6 +26,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   loadExerciseData();
 });
+
+function setExerciseFormMode(mode) {
+  document.getElementById('eSubmit').textContent = mode === 'edit' ? 'Update entry' : 'Save entry';
+  document.getElementById('eCancelEdit').style.display = mode === 'edit' ? '' : 'none';
+}
 
 // Parses "mm:ss" (or a bare number of minutes) into fractional minutes.
 function parseMinutesSeconds(str) {
@@ -179,27 +189,97 @@ async function submitExercise() {
     }
   }
 
-  const { data: inserted, error } = await supabaseClient.from('exercise_entries').insert(entry).select().single();
-  if (error) {
-    errorEl.textContent = error.message;
-    return;
+  let entryId = editingExerciseId;
+
+  if (editingExerciseId) {
+    const { error: updateError } = await supabaseClient.from('exercise_entries').update(entry).eq('id', editingExerciseId);
+    if (updateError) {
+      errorEl.textContent = updateError.message;
+      return;
+    }
+    // Replace whatever items existed before — simpler than diffing, and category may have changed.
+    await supabaseClient.from('exercise_items').delete().eq('exercise_entry_id', entryId);
+  } else {
+    const { data: inserted, error: insertError } = await supabaseClient.from('exercise_entries').insert(entry).select().single();
+    if (insertError) {
+      errorEl.textContent = insertError.message;
+      return;
+    }
+    entryId = inserted.id;
   }
 
   if (items.length) {
-    const itemRows = items.map(it => ({ ...it, exercise_entry_id: inserted.id }));
+    const itemRows = items.map(it => ({ ...it, exercise_entry_id: entryId }));
     const { error: itemsError } = await supabaseClient.from('exercise_items').insert(itemRows);
     if (itemsError) {
       errorEl.textContent = itemsError.message;
-      await supabaseClient.from('exercise_entries').delete().eq('id', inserted.id);
+      if (!editingExerciseId) await supabaseClient.from('exercise_entries').delete().eq('id', entryId);
       return;
     }
   }
 
+  editingExerciseId = null;
+  setExerciseFormMode('add');
   ['eName', 'eDuration', 'eDistance', 'ePace', 'eCalories', 'eNotes'].forEach(id => {
     document.getElementById(id).value = '';
   });
   resetExerciseRows();
   loadExerciseData();
+}
+
+function editExercise(id) {
+  const r = exerciseRows.find(x => x.id === id);
+  if (!r) return;
+
+  editingExerciseId = id;
+
+  document.getElementById('eDate').value = r.logged_at;
+  document.getElementById('eCategory').value = r.category;
+  document.getElementById('eName').value = r.exercise_name;
+  document.getElementById('eDuration').value = r.duration_min ? formatMinutesSeconds(r.duration_min) : '';
+  document.getElementById('eCalories').value = r.calories_burned ?? '';
+  document.getElementById('eNotes').value = r.notes ?? '';
+
+  updateCategoryFields();
+
+  if (r.category === 'cardio') {
+    document.getElementById('eDistance').value = r.distance_mi ?? '';
+    document.getElementById('ePace').value = r.pace_sec_per_mi ? formatMinutesSeconds(r.pace_sec_per_mi / 60) : '';
+  } else {
+    document.getElementById('eDistance').value = '';
+    document.getElementById('ePace').value = '';
+    const container = document.getElementById('eExercises');
+    container.innerHTML = '';
+    const entryItems = exerciseItemsByEntry[id];
+    if (entryItems && entryItems.length) {
+      entryItems.forEach(it => {
+        const row = exerciseRowEl();
+        row.querySelector('.ex-name').value = it.name;
+        row.querySelector('.ex-sets').value = it.sets ?? '';
+        row.querySelector('.ex-reps').value = it.reps ?? '';
+        row.querySelector('.ex-load').value = it.load_lbs ?? '';
+        container.appendChild(row);
+      });
+    } else {
+      container.appendChild(exerciseRowEl());
+    }
+    updateExerciseRemoveButtons();
+  }
+
+  setExerciseFormMode('edit');
+  document.getElementById('eDate').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function cancelExerciseEdit() {
+  editingExerciseId = null;
+  document.getElementById('eDate').value = todayISO();
+  document.getElementById('eCategory').value = 'cardio';
+  updateCategoryFields();
+  ['eName', 'eDuration', 'eDistance', 'ePace', 'eCalories', 'eNotes'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  resetExerciseRows();
+  setExerciseFormMode('add');
 }
 
 async function deleteExercise(id) {
@@ -231,8 +311,14 @@ async function loadExerciseData() {
     items = itemRows || [];
   }
 
+  exerciseRows = entries;
+  exerciseItemsByEntry = {};
+  items.forEach(it => {
+    (exerciseItemsByEntry[it.exercise_entry_id] = exerciseItemsByEntry[it.exercise_entry_id] || []).push(it);
+  });
+
   renderExerciseCounts(entries);
-  renderExerciseHistory(entries, items);
+  renderExerciseHistory(entries);
 }
 
 const EXERCISE_CATEGORIES = ['cardio', 'lifting', 'core'];
@@ -251,22 +337,17 @@ function renderExerciseCounts(rows) {
   `).join('');
 }
 
-function renderExerciseHistory(rows, items) {
+function renderExerciseHistory(rows) {
   const historyEl = document.getElementById('eHistory');
   if (!rows.length) {
     historyEl.innerHTML = '<div class="empty-note">No entries yet.</div>';
     return;
   }
 
-  const itemsByEntry = {};
-  items.forEach(it => {
-    (itemsByEntry[it.exercise_entry_id] = itemsByEntry[it.exercise_entry_id] || []).push(it);
-  });
-
   const grids = [
     renderCardioGrid(rows.filter(r => r.category === 'cardio')),
-    renderStrengthGrid(rows.filter(r => r.category === 'lifting'), itemsByEntry, 'Lifting'),
-    renderStrengthGrid(rows.filter(r => r.category === 'core'), itemsByEntry, 'Core'),
+    renderStrengthGrid(rows.filter(r => r.category === 'lifting'), 'Lifting'),
+    renderStrengthGrid(rows.filter(r => r.category === 'core'), 'Core'),
   ].filter(Boolean);
 
   historyEl.innerHTML = grids.join('') || '<div class="empty-note">No entries yet.</div>';
@@ -289,12 +370,20 @@ function renderCardioGrid(rows) {
       <td>${paceCell(r)}</td>
       <td>${caloriesCell(r)}</td>
       <td>${r.notes ? escapeHtml(r.notes) : '—'}</td>
-      <td><button class="btn-danger" onclick="deleteExercise('${r.id}')">Delete</button></td>
+      <td>
+        <div class="row-actions">
+          <button class="btn-secondary" onclick="editExercise('${r.id}')">Edit</button>
+          <button class="btn-danger" onclick="deleteExercise('${r.id}')">Delete</button>
+        </div>
+      </td>
     </tr>
   `).join('');
 
   return `
-    <h3 class="history-subhead">Cardio</h3>
+    <div class="history-subhead-row">
+      <h3 class="history-subhead">Cardio</h3>
+      <button class="btn-tiny" onclick="exportCardioCSV()">Export CSV</button>
+    </div>
     <div class="table-scroll">
       <table class="history-table">
         <thead>
@@ -308,11 +397,11 @@ function renderCardioGrid(rows) {
 
 // Renders one row per exercise item; legacy entries saved before exercise_items
 // existed fall back to their old serialized `details` text as a single line.
-function renderStrengthGrid(rows, itemsByEntry, label) {
+function renderStrengthGrid(rows, label) {
   if (!rows.length) return '';
 
   const rowsHtml = rows.slice(0, 40).flatMap(r => {
-    const entryItems = itemsByEntry[r.id];
+    const entryItems = exerciseItemsByEntry[r.id];
     const lines = entryItems && entryItems.length
       ? entryItems.map(it => [it.name, it.sets, it.reps, it.load_lbs])
       : [[r.details || '—', null, null, null]];
@@ -328,13 +417,21 @@ function renderStrengthGrid(rows, itemsByEntry, label) {
         <td>${idx === 0 ? (r.duration_min ? formatMinutesSeconds(r.duration_min) : '—') : ''}</td>
         <td>${idx === 0 ? (r.calories_burned ? r.calories_burned : '—') : ''}</td>
         <td>${idx === 0 ? (r.notes ? escapeHtml(r.notes) : '—') : ''}</td>
-        <td>${idx === 0 ? `<button class="btn-danger" onclick="deleteExercise('${r.id}')">Delete</button>` : ''}</td>
+        <td>${idx === 0 ? `
+          <div class="row-actions">
+            <button class="btn-secondary" onclick="editExercise('${r.id}')">Edit</button>
+            <button class="btn-danger" onclick="deleteExercise('${r.id}')">Delete</button>
+          </div>
+        ` : ''}</td>
       </tr>
     `).join('');
   }).join('');
 
   return `
-    <h3 class="history-subhead">${escapeHtml(label)}</h3>
+    <div class="history-subhead-row">
+      <h3 class="history-subhead">${escapeHtml(label)}</h3>
+      <button class="btn-tiny" onclick="exportStrengthCSV('${label.toLowerCase()}')">Export CSV</button>
+    </div>
     <div class="table-scroll">
       <table class="history-table">
         <thead>
@@ -344,4 +441,71 @@ function renderStrengthGrid(rows, itemsByEntry, label) {
       </table>
     </div>
   `;
+}
+
+async function exportCardioCSV() {
+  const { data, error } = await supabaseClient
+    .from('exercise_entries')
+    .select('*')
+    .eq('category', 'cardio')
+    .order('logged_at', { ascending: true });
+  if (error || !data || !data.length) return;
+
+  const rows = [['Date', 'Title', 'Duration', 'Distance (mi)', 'Pace (min/mi)', 'Calories', 'Notes']];
+  data.forEach(r => {
+    rows.push([
+      r.logged_at,
+      r.exercise_name,
+      r.duration_min ? formatMinutesSeconds(r.duration_min) : '',
+      r.distance_mi ?? '',
+      r.pace_sec_per_mi ? formatMinutesSeconds(r.pace_sec_per_mi / 60) : '',
+      r.calories_burned ?? '',
+      r.notes ?? '',
+    ]);
+  });
+  downloadCSV('trackro-cardio.csv', rows);
+}
+
+async function exportStrengthCSV(category) {
+  const { data: entries, error } = await supabaseClient
+    .from('exercise_entries')
+    .select('*')
+    .eq('category', category)
+    .order('logged_at', { ascending: true });
+  if (error || !entries || !entries.length) return;
+
+  const ids = entries.map(e => e.id);
+  const { data: itemRows } = await supabaseClient
+    .from('exercise_items')
+    .select('*')
+    .in('exercise_entry_id', ids)
+    .order('position', { ascending: true });
+
+  const itemsByEntry = {};
+  (itemRows || []).forEach(it => {
+    (itemsByEntry[it.exercise_entry_id] = itemsByEntry[it.exercise_entry_id] || []).push(it);
+  });
+
+  const rows = [['Date', 'Title', 'Exercise', 'Sets', 'Reps', 'Load (lbs)', 'Duration', 'Calories', 'Notes']];
+  entries.forEach(r => {
+    const entryItems = itemsByEntry[r.id];
+    const lines = entryItems && entryItems.length
+      ? entryItems.map(it => [it.name, it.sets ?? '', it.reps ?? '', it.load_lbs ?? ''])
+      : [[r.details || '', '', '', '']];
+
+    lines.forEach(([name, sets, reps, load]) => {
+      rows.push([
+        r.logged_at,
+        r.exercise_name,
+        name,
+        sets,
+        reps,
+        load,
+        r.duration_min ? formatMinutesSeconds(r.duration_min) : '',
+        r.calories_burned ?? '',
+        r.notes ?? '',
+      ]);
+    });
+  });
+  downloadCSV(`trackro-${category}.csv`, rows);
 }

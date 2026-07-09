@@ -214,12 +214,23 @@ table.history-table tr.group-start td { border-top: 2px solid var(--border-mid);
 table.history-table tr.group-start:first-child td { border-top: none; }
 .table-scroll { overflow-x: auto; }
 
+.history-subhead-row {
+  display: flex; justify-content: space-between; align-items: center;
+  margin: 20px 0 8px;
+}
+.history-subhead-row:first-child { margin-top: 0; }
 .history-subhead {
   font-size: 12px; font-weight: 600; color: var(--text-muted);
   text-transform: uppercase; letter-spacing: 0.06em;
-  margin: 20px 0 8px;
 }
-.history-subhead:first-child { margin-top: 0; }
+.btn-tiny {
+  background: var(--surface); color: var(--text-muted);
+  border: 1px solid var(--border-mid); border-radius: var(--radius-sm);
+  padding: 3px 10px; font-size: 11px; font-weight: 500;
+  cursor: pointer; font-family: 'DM Sans', sans-serif;
+}
+.btn-tiny:hover { background: var(--surface-2); color: var(--text); }
+.row-actions { display: flex; gap: 6px; }
 
 /* ── Chart containers ── */
 .chart-wrap { position: relative; height: 220px; margin-bottom: 4px; }
