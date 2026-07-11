@@ -4,7 +4,24 @@
  * all three tables plus goals.
  */
 let dWeightChartInstance = null;
+let dCalorieChartInstance = null;
+let dMacroChartInstance = null;
 const EXERCISE_CATEGORIES = ['cardio', 'lifting', 'core'];
+
+const GOAL_LINE_COLOR = '#7A7672';
+function goalLineDataset(label, count, value, hidden) {
+  return {
+    label,
+    data: Array(count).fill(value),
+    borderColor: GOAL_LINE_COLOR,
+    borderDash: [6, 4],
+    borderWidth: 1.5,
+    pointRadius: 0,
+    tension: 0,
+    fill: false,
+    hidden: !!hidden,
+  };
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   initNav('dashboard');
@@ -29,6 +46,8 @@ async function loadDashboard() {
   renderStats(weights || [], exercises || [], macros || [], goals);
   renderWeightChart(weights || []);
   renderTodayMacros(macros || [], goals);
+  renderCalorieChart(macros || [], goals);
+  renderMacroGramChart(macros || [], goals);
   renderExerciseCounts(exercises || []);
 }
 
@@ -121,6 +140,95 @@ function renderTodayMacros(rows, goals) {
       </div>
     `;
   }).join('') || '<div class="empty-note">Set targets on the Goals page.</div>';
+}
+
+function renderCalorieChart(rows, goals) {
+  const byDay = {};
+  rows.forEach(r => {
+    byDay[r.logged_at] = (byDay[r.logged_at] || 0) + Number(r.calories || 0);
+  });
+  const days = Object.keys(byDay).sort();
+  const labels = days.map(formatDateShort);
+  const values = days.map(d => byDay[d]);
+
+  const datasets = [{
+    label: 'Calories',
+    data: values,
+    borderColor: '#A86300',
+    backgroundColor: 'rgba(168,99,0,0.1)',
+    tension: 0.25,
+    fill: true,
+    pointRadius: 2,
+  }];
+  if (goals?.target_calories) {
+    datasets.push(goalLineDataset('Goal', days.length, goals.target_calories));
+  }
+
+  const ctx = document.getElementById('dCalorieChart').getContext('2d');
+  if (dCalorieChartInstance) dCalorieChartInstance.destroy();
+  dCalorieChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: datasets.length > 1, labels: { boxWidth: 12, font: { size: 11 } } } },
+      scales: {
+        y: { beginAtZero: true, ticks: { font: { size: 11 } } },
+        x: { ticks: { font: { size: 10 } } },
+      },
+    },
+  });
+}
+
+function renderMacroGramChart(rows, goals) {
+  const byDay = {};
+  rows.forEach(r => {
+    if (!byDay[r.logged_at]) byDay[r.logged_at] = { protein_g: 0, carbs_g: 0, fat_g: 0 };
+    byDay[r.logged_at].protein_g += Number(r.protein_g || 0);
+    byDay[r.logged_at].carbs_g += Number(r.carbs_g || 0);
+    byDay[r.logged_at].fat_g += Number(r.fat_g || 0);
+  });
+  const days = Object.keys(byDay).sort();
+  const labels = days.map(formatDateShort);
+
+  const series = [
+    ['Protein (g)', 'protein_g', '#0F7A6E', 'target_protein_g'],
+    ['Carbs (g)', 'carbs_g', '#1B5EAB', 'target_carbs_g'],
+    ['Fat (g)', 'fat_g', '#A86300', 'target_fat_g'],
+  ];
+
+  const datasets = [];
+  series.forEach(([label, key, color, goalKey]) => {
+    datasets.push({
+      label,
+      data: days.map(d => byDay[d][key]),
+      borderColor: color,
+      backgroundColor: 'transparent',
+      tension: 0.25,
+      pointRadius: 2,
+    });
+    // Goal lines start hidden (toggle via legend) — 6 lines at once was too busy.
+    if (goals?.[goalKey]) {
+      datasets.push(goalLineDataset(`${label} goal`, days.length, goals[goalKey], true));
+    }
+  });
+
+  const ctx = document.getElementById('dMacroChart').getContext('2d');
+  if (dMacroChartInstance) dMacroChartInstance.destroy();
+  dMacroChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: true, position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } },
+      scales: {
+        y: { beginAtZero: true, ticks: { font: { size: 11 } } },
+        x: { ticks: { font: { size: 10 } } },
+      },
+    },
+  });
 }
 
 function renderExerciseCounts(rows) {

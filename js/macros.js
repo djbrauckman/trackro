@@ -4,9 +4,26 @@
  * calorie trend chart, history table.
  */
 let mChartInstance = null;
+let mMacroChartInstance = null;
 let commonFoods = [];
 let macroRows = [];
 let editingMacroId = null;
+let macroHistoryExpanded = false;
+
+const GOAL_LINE_COLOR = '#7A7672';
+function goalLineDataset(label, count, value, hidden) {
+  return {
+    label,
+    data: Array(count).fill(value),
+    borderColor: GOAL_LINE_COLOR,
+    borderDash: [6, 4],
+    borderWidth: 1.5,
+    pointRadius: 0,
+    tension: 0,
+    fill: false,
+    hidden: !!hidden,
+  };
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   initNav('macros');
@@ -16,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('mSubmit').addEventListener('click', submitMacro);
   document.getElementById('mCancelEdit').addEventListener('click', cancelMacroEdit);
   document.getElementById('mAddIngredient').addEventListener('click', addIngredientRow);
+  document.getElementById('mClearIngredients').addEventListener('click', clearMacroIngredients);
   document.getElementById('mIngredients').addEventListener('click', (e) => {
     if (e.target.classList.contains('ing-remove')) {
       removeIngredientRow(e.target.closest('.repeatable-row'));
@@ -94,6 +112,12 @@ function resetIngredientRows() {
   container.innerHTML = '';
   container.appendChild(ingredientRowEl());
   updateIngredientRemoveButtons();
+}
+
+// Clears just the food/ingredient rows, leaving date, meal, and edit state untouched.
+function clearMacroIngredients() {
+  resetIngredientRows();
+  document.getElementById('mError').textContent = '';
 }
 
 function autofillIngredientRow(foodInput) {
@@ -201,6 +225,33 @@ function cancelMacroEdit() {
   setMacroFormMode('add');
 }
 
+// Repopulates the form from a past entry as a new (not edited) entry, logged today.
+// Does not touch the common foods dictionary — this is just a form shortcut.
+function copyMacro(id) {
+  const r = macroRows.find(x => x.id === id);
+  if (!r) return;
+
+  editingMacroId = null;
+  setMacroFormMode('add');
+
+  document.getElementById('mDate').value = todayISO();
+  document.getElementById('mMeal').value = r.meal_name;
+
+  const container = document.getElementById('mIngredients');
+  container.innerHTML = '';
+  const row = ingredientRowEl();
+  row.querySelector('.ing-food').value = r.food_name;
+  row.querySelector('.ing-qty').value = 1;
+  row.querySelector('.ing-cal').value = r.calories;
+  row.querySelector('.ing-protein').value = r.protein_g;
+  row.querySelector('.ing-carbs').value = r.carbs_g;
+  row.querySelector('.ing-fat').value = r.fat_g;
+  container.appendChild(row);
+  updateIngredientRemoveButtons();
+
+  document.getElementById('mDate').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 async function deleteMacro(id) {
   await supabaseClient.from('macro_entries').delete().eq('id', id);
   loadMacroData();
@@ -298,7 +349,8 @@ async function loadMacroData() {
   macroRows = recent;
 
   renderTodayProgress(recent, goals);
-  renderCalorieChart(recent);
+  renderCalorieChart(recent, goals);
+  renderMacroGramChart(recent, goals);
   renderMacroHistory(recent);
 }
 
@@ -333,7 +385,7 @@ function renderTodayProgress(rows, goals) {
   }).join('') || '<div class="empty-note">Set targets on the Goals page.</div>';
 }
 
-function renderCalorieChart(rows) {
+function renderCalorieChart(rows, goals) {
   const byDay = {};
   rows.forEach(r => {
     byDay[r.logged_at] = (byDay[r.logged_at] || 0) + Number(r.calories || 0);
@@ -342,32 +394,91 @@ function renderCalorieChart(rows) {
   const labels = days.map(formatDateShort);
   const values = days.map(d => byDay[d]);
 
+  const datasets = [{
+    label: 'Calories',
+    data: values,
+    borderColor: '#A86300',
+    backgroundColor: 'rgba(168,99,0,0.1)',
+    tension: 0.25,
+    fill: true,
+    pointRadius: 2,
+  }];
+  if (goals?.target_calories) {
+    datasets.push(goalLineDataset('Goal', days.length, goals.target_calories));
+  }
+
   const ctx = document.getElementById('mChart').getContext('2d');
   if (mChartInstance) mChartInstance.destroy();
   mChartInstance = new Chart(ctx, {
     type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Calories',
-        data: values,
-        borderColor: '#A86300',
-        backgroundColor: 'rgba(168,99,0,0.1)',
-        tension: 0.25,
-        fill: true,
-        pointRadius: 2,
-      }],
-    },
+    data: { labels, datasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: { legend: { display: datasets.length > 1, labels: { boxWidth: 12, font: { size: 11 } } } },
       scales: {
         y: { beginAtZero: true, ticks: { font: { size: 11 } } },
         x: { ticks: { font: { size: 10 } } },
       },
     },
   });
+}
+
+function renderMacroGramChart(rows, goals) {
+  const byDay = {};
+  rows.forEach(r => {
+    if (!byDay[r.logged_at]) byDay[r.logged_at] = { protein_g: 0, carbs_g: 0, fat_g: 0 };
+    byDay[r.logged_at].protein_g += Number(r.protein_g || 0);
+    byDay[r.logged_at].carbs_g += Number(r.carbs_g || 0);
+    byDay[r.logged_at].fat_g += Number(r.fat_g || 0);
+  });
+  const days = Object.keys(byDay).sort();
+  const labels = days.map(formatDateShort);
+
+  const series = [
+    ['Protein (g)', 'protein_g', '#0F7A6E', 'target_protein_g'],
+    ['Carbs (g)', 'carbs_g', '#1B5EAB', 'target_carbs_g'],
+    ['Fat (g)', 'fat_g', '#A86300', 'target_fat_g'],
+  ];
+
+  const datasets = [];
+  series.forEach(([label, key, color, goalKey]) => {
+    datasets.push({
+      label,
+      data: days.map(d => byDay[d][key]),
+      borderColor: color,
+      backgroundColor: 'transparent',
+      tension: 0.25,
+      pointRadius: 2,
+    });
+    // Goal lines start hidden (toggle via legend) — 6 lines at once was too busy.
+    if (goals?.[goalKey]) {
+      datasets.push(goalLineDataset(`${label} goal`, days.length, goals[goalKey], true));
+    }
+  });
+
+  const ctx = document.getElementById('mMacroChart').getContext('2d');
+  if (mMacroChartInstance) mMacroChartInstance.destroy();
+  mMacroChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: true, position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } },
+      scales: {
+        y: { beginAtZero: true, ticks: { font: { size: 11 } } },
+        x: { ticks: { font: { size: 10 } } },
+      },
+    },
+  });
+}
+
+const MACRO_HISTORY_PAGE_SIZE = 10;
+
+function toggleMacroHistory() {
+  macroHistoryExpanded = !macroHistoryExpanded;
+  renderMacroHistory(macroRows);
 }
 
 function renderMacroHistory(rows) {
@@ -377,7 +488,9 @@ function renderMacroHistory(rows) {
     return;
   }
 
-  const rowsHtml = rows.slice(0, 25).map(r => `
+  const visibleRows = macroHistoryExpanded ? rows : rows.slice(0, MACRO_HISTORY_PAGE_SIZE);
+
+  const rowsHtml = visibleRows.map(r => `
     <tr>
       <td>${formatDateShort(r.logged_at)}</td>
       <td>${escapeHtml(r.meal_name)}</td>
@@ -385,6 +498,7 @@ function renderMacroHistory(rows) {
       <td>${r.calories} cal · ${r.protein_g}p / ${r.carbs_g}c / ${r.fat_g}f</td>
       <td>
         <div class="row-actions">
+          <button class="btn-secondary" onclick="copyMacro('${r.id}')">Copy</button>
           <button class="btn-secondary" onclick="editMacro('${r.id}')">Edit</button>
           <button class="btn-danger" onclick="deleteMacro('${r.id}')">Delete</button>
         </div>
@@ -392,10 +506,19 @@ function renderMacroHistory(rows) {
     </tr>
   `).join('');
 
+  const toggleHtml = rows.length > MACRO_HISTORY_PAGE_SIZE
+    ? `<div class="btn-row" style="margin-top:12px">
+         <button class="btn-tiny" onclick="toggleMacroHistory()">
+           ${macroHistoryExpanded ? 'Show fewer' : `Show all ${rows.length}`}
+         </button>
+       </div>`
+    : '';
+
   historyEl.innerHTML = `
     <table class="history-table">
       <thead><tr><th>Date</th><th>Meal</th><th>Food</th><th>Macros</th><th></th></tr></thead>
       <tbody>${rowsHtml}</tbody>
     </table>
+    ${toggleHtml}
   `;
 }

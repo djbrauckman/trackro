@@ -38,6 +38,7 @@
 
       <div class="btn-row" style="margin-top:0; margin-bottom:16px;">
         <button type="button" class="btn-secondary" id="mAddIngredient">+ Add ingredient</button>
+        <button type="button" class="btn-secondary" id="mClearIngredients">Clear</button>
       </div>
       <div class="empty-note" style="margin-top:-8px; margin-bottom:16px;">
         Enter macros per unit (e.g. per egg) — Qty multiplies them. Add multiple ingredients (e.g. for a sandwich) and they'll be summed into one entry.
@@ -59,6 +60,13 @@
       <h2>Calorie trend (last 30 days)</h2>
       <div class="chart-wrap">
         <canvas id="mChart"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Macro trend (last 30 days)</h2>
+      <div class="chart-wrap">
+        <canvas id="mMacroChart"></canvas>
       </div>
     </div>
 
