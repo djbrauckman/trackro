@@ -53,6 +53,10 @@ npx vercel
 
 Any other static host (Netlify, GitHub Pages, Cloudflare Pages) works the same way as Option A, as long as you upload `js/config.js` alongside the rest of the files.
 
+## Install to your home screen
+
+Trackro is a PWA — on your phone, open the deployed site and use "Add to Home Screen" (iOS Safari) or the install prompt (Android Chrome) to get an app icon and a standalone window without browser chrome. `manifest.json` and `sw.js` (a minimal service worker that caches the static shell for offline/flaky-connection boot) are already wired up on every page.
+
 ## Pages
 
 - **Dashboard** (`index.html`) — overview: weight trend, today's macros vs targets, weekly exercise volume.
