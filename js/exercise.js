@@ -372,8 +372,8 @@ function renderCardioGrid(rows) {
       <td>${r.notes ? escapeHtml(r.notes) : '—'}</td>
       <td>
         <div class="row-actions">
-          <button class="btn-secondary" onclick="editExercise('${r.id}')">Edit</button>
-          <button class="btn-danger" onclick="deleteExercise('${r.id}')">Delete</button>
+          <button class="icon-btn" title="Edit" onclick="editExercise('${r.id}')">${ICON_EDIT}</button>
+          <button class="icon-btn icon-btn-danger" title="Delete" onclick="deleteExercise('${r.id}')">${ICON_TRASH}</button>
         </div>
       </td>
     </tr>
@@ -419,8 +419,8 @@ function renderStrengthGrid(rows, label) {
         <td>${idx === 0 ? (r.notes ? escapeHtml(r.notes) : '—') : ''}</td>
         <td>${idx === 0 ? `
           <div class="row-actions">
-            <button class="btn-secondary" onclick="editExercise('${r.id}')">Edit</button>
-            <button class="btn-danger" onclick="deleteExercise('${r.id}')">Delete</button>
+            <button class="icon-btn" title="Edit" onclick="editExercise('${r.id}')">${ICON_EDIT}</button>
+            <button class="icon-btn icon-btn-danger" title="Delete" onclick="deleteExercise('${r.id}')">${ICON_TRASH}</button>
           </div>
         ` : ''}</td>
       </tr>

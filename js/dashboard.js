@@ -1,19 +1,19 @@
 /**
  * dashboard.js
  * Logic for index.html: overview stat tiles + summary charts pulled from
- * all three tables plus goals.
+ * all three tables plus targets.
  */
 let dWeightChartInstance = null;
 let dCalorieChartInstance = null;
 let dMacroChartInstance = null;
 const EXERCISE_CATEGORIES = ['cardio', 'lifting', 'core'];
 
-const GOAL_LINE_COLOR = '#7A7672';
-function goalLineDataset(label, count, value, hidden) {
+const TARGET_LINE_COLOR = '#7A7672';
+function targetLineDataset(label, count, value, hidden) {
   return {
     label,
     data: Array(count).fill(value),
-    borderColor: GOAL_LINE_COLOR,
+    borderColor: TARGET_LINE_COLOR,
     borderDash: [6, 4],
     borderWidth: 1.5,
     pointRadius: 0,
@@ -36,22 +36,22 @@ function weekStartISO(isoDate) {
 }
 
 async function loadDashboard() {
-  const [{ data: weights }, { data: exercises }, { data: macros }, { data: goals }] = await Promise.all([
+  const [{ data: weights }, { data: exercises }, { data: macros }, { data: targets }] = await Promise.all([
     supabaseClient.from('weight_entries').select('*').gte('logged_at', daysAgoISO(60)).order('logged_at', { ascending: true }),
     supabaseClient.from('exercise_entries').select('*').gte('logged_at', daysAgoISO(60)).order('logged_at', { ascending: true }),
     supabaseClient.from('macro_entries').select('*').gte('logged_at', daysAgoISO(30)).order('logged_at', { ascending: true }),
     supabaseClient.from('goals').select('*').eq('id', 1).single(),
   ]);
 
-  renderStats(weights || [], exercises || [], macros || [], goals);
+  renderStats(weights || [], exercises || [], macros || [], targets);
   renderWeightChart(weights || []);
-  renderTodayMacros(macros || [], goals);
-  renderCalorieChart(macros || [], goals);
-  renderMacroGramChart(macros || [], goals);
+  renderTodayMacros(macros || [], targets);
+  renderCalorieChart(macros || [], targets);
+  renderMacroGramChart(macros || [], targets);
   renderExerciseCounts(exercises || []);
 }
 
-function renderStats(weights, exercises, macros, goals) {
+function renderStats(weights, exercises, macros, targets) {
   const latestWeight = weights.length ? weights[weights.length - 1].weight_lbs : null;
   const monthAgoWeight = (() => {
     const cutoff = daysAgoISO(30);
@@ -73,7 +73,7 @@ function renderStats(weights, exercises, macros, goals) {
   const tiles = [
     ['Current weight', latestWeight !== null ? `${latestWeight} lbs` : '—'],
     ['30-day change', weightChange !== null ? `${weightChange > 0 ? '+' : ''}${weightChange} lbs` : '—'],
-    ['Today\'s calories', goals?.target_calories ? `${todaysCalories} / ${goals.target_calories}` : `${todaysCalories}`],
+    ['Today\'s calories', targets?.target_calories ? `${todaysCalories} / ${targets.target_calories}` : `${todaysCalories}`],
     ['Sessions this week', `${sessionsThisWeek}`],
   ];
 
@@ -111,7 +111,7 @@ function renderWeightChart(rows) {
   });
 }
 
-function renderTodayMacros(rows, goals) {
+function renderTodayMacros(rows, targets) {
   const today = todayISO();
   const todays = rows.filter(r => r.logged_at === today);
   const totals = todays.reduce((acc, r) => ({
@@ -122,10 +122,10 @@ function renderTodayMacros(rows, goals) {
   }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 });
 
   const bars = [
-    ['Calories', totals.calories, goals?.target_calories, ''],
-    ['Protein', totals.protein_g, goals?.target_protein_g, 'g'],
-    ['Carbs', totals.carbs_g, goals?.target_carbs_g, 'g'],
-    ['Fat', totals.fat_g, goals?.target_fat_g, 'g'],
+    ['Calories', totals.calories, targets?.target_calories, ''],
+    ['Protein', totals.protein_g, targets?.target_protein_g, 'g'],
+    ['Carbs', totals.carbs_g, targets?.target_carbs_g, 'g'],
+    ['Fat', totals.fat_g, targets?.target_fat_g, 'g'],
   ];
 
   const el = document.getElementById('dMacros');
@@ -139,10 +139,10 @@ function renderTodayMacros(rows, goals) {
         <div class="progress-track"><div class="progress-fill${over ? ' over' : ''}" style="width:${target ? pct : 0}%"></div></div>
       </div>
     `;
-  }).join('') || '<div class="empty-note">Set targets on the Goals page.</div>';
+  }).join('') || '<div class="empty-note">Set targets on the Targets page.</div>';
 }
 
-function renderCalorieChart(rows, goals) {
+function renderCalorieChart(rows, targets) {
   const byDay = {};
   rows.forEach(r => {
     byDay[r.logged_at] = (byDay[r.logged_at] || 0) + Number(r.calories || 0);
@@ -160,8 +160,8 @@ function renderCalorieChart(rows, goals) {
     fill: true,
     pointRadius: 2,
   }];
-  if (goals?.target_calories) {
-    datasets.push(goalLineDataset('Goal', days.length, goals.target_calories));
+  if (targets?.target_calories) {
+    datasets.push(targetLineDataset('Target', days.length, targets.target_calories));
   }
 
   const ctx = document.getElementById('dCalorieChart').getContext('2d');
@@ -181,7 +181,7 @@ function renderCalorieChart(rows, goals) {
   });
 }
 
-function renderMacroGramChart(rows, goals) {
+function renderMacroGramChart(rows, targets) {
   const byDay = {};
   rows.forEach(r => {
     if (!byDay[r.logged_at]) byDay[r.logged_at] = { protein_g: 0, carbs_g: 0, fat_g: 0 };
@@ -199,7 +199,7 @@ function renderMacroGramChart(rows, goals) {
   ];
 
   const datasets = [];
-  series.forEach(([label, key, color, goalKey]) => {
+  series.forEach(([label, key, color, targetKey]) => {
     datasets.push({
       label,
       data: days.map(d => byDay[d][key]),
@@ -208,9 +208,9 @@ function renderMacroGramChart(rows, goals) {
       tension: 0.25,
       pointRadius: 2,
     });
-    // Goal lines start hidden (toggle via legend) — 6 lines at once was too busy.
-    if (goals?.[goalKey]) {
-      datasets.push(goalLineDataset(`${label} goal`, days.length, goals[goalKey], true));
+    // Target lines start hidden (toggle via legend) — 6 lines at once was too busy.
+    if (targets?.[targetKey]) {
+      datasets.push(targetLineDataset(`${label} target`, days.length, targets[targetKey], true));
     }
   });
 

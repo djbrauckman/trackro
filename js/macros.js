@@ -9,13 +9,14 @@ let commonFoods = [];
 let macroRows = [];
 let editingMacroId = null;
 let macroHistoryExpanded = false;
+let commonFoodsExpanded = false;
 
-const GOAL_LINE_COLOR = '#7A7672';
-function goalLineDataset(label, count, value, hidden) {
+const TARGET_LINE_COLOR = '#7A7672';
+function targetLineDataset(label, count, value, hidden) {
   return {
     label,
     data: Array(count).fill(value),
-    borderColor: GOAL_LINE_COLOR,
+    borderColor: TARGET_LINE_COLOR,
     borderDash: [6, 4],
     borderWidth: 1.5,
     pointRadius: 0,
@@ -257,6 +258,27 @@ async function deleteMacro(id) {
   loadMacroData();
 }
 
+// Saves a history row's stored totals straight into the common foods dictionary
+// under its existing name (upsert, so re-adding the same name just updates it).
+async function addHistoryToCommonFoods(id) {
+  const r = macroRows.find(x => x.id === id);
+  if (!r) return;
+
+  const { error } = await supabaseClient.from('common_foods').upsert({
+    name: r.food_name,
+    calories: r.calories,
+    protein_g: r.protein_g,
+    carbs_g: r.carbs_g,
+    fat_g: r.fat_g,
+  }, { onConflict: 'name' });
+
+  if (error) {
+    document.getElementById('mError').textContent = error.message;
+    return;
+  }
+  loadCommonFoods();
+}
+
 async function loadCommonFoods() {
   const { data, error } = await supabaseClient.from('common_foods').select('*').order('name');
   const listEl = document.getElementById('cfList');
@@ -270,23 +292,49 @@ async function loadCommonFoods() {
     .map(f => `<option value="${escapeHtml(f.name)}"></option>`)
     .join('');
 
+  renderCommonFoodsList();
+}
+
+const COMMON_FOODS_PAGE_SIZE = 10;
+
+function toggleCommonFoods() {
+  commonFoodsExpanded = !commonFoodsExpanded;
+  renderCommonFoodsList();
+}
+
+function renderCommonFoodsList() {
+  const listEl = document.getElementById('cfList');
   if (!commonFoods.length) {
     listEl.innerHTML = '<div class="empty-note">No common foods saved yet.</div>';
     return;
   }
+
+  const visible = commonFoodsExpanded ? commonFoods : commonFoods.slice(0, COMMON_FOODS_PAGE_SIZE);
+
+  const toggleHtml = commonFoods.length > COMMON_FOODS_PAGE_SIZE
+    ? `<div class="btn-row" style="margin-top:12px">
+         <button class="btn-tiny" onclick="toggleCommonFoods()">
+           ${commonFoodsExpanded ? 'Show fewer' : `Show all ${commonFoods.length}`}
+         </button>
+       </div>`
+    : '';
+
   listEl.innerHTML = `
     <table class="history-table">
       <thead><tr><th>Name</th><th>Macros (per unit)</th><th></th></tr></thead>
       <tbody>
-        ${commonFoods.map(f => `
+        ${visible.map(f => `
           <tr>
             <td>${escapeHtml(f.name)}</td>
             <td>${f.calories} cal · ${f.protein_g}p / ${f.carbs_g}c / ${f.fat_g}f</td>
-            <td><button class="btn-danger" onclick="deleteCommonFood('${f.id}')">Delete</button></td>
+            <td>
+              <button class="icon-btn icon-btn-danger" title="Delete" onclick="deleteCommonFood('${f.id}')">${ICON_TRASH}</button>
+            </td>
           </tr>
         `).join('')}
       </tbody>
     </table>
+    ${toggleHtml}
   `;
 }
 
@@ -331,7 +379,7 @@ async function deleteCommonFood(id) {
 }
 
 async function loadMacroData() {
-  const [{ data: goals }, { data: recent, error }] = await Promise.all([
+  const [{ data: targets }, { data: recent, error }] = await Promise.all([
     supabaseClient.from('goals').select('*').eq('id', 1).single(),
     supabaseClient
       .from('macro_entries')
@@ -348,13 +396,13 @@ async function loadMacroData() {
 
   macroRows = recent;
 
-  renderTodayProgress(recent, goals);
-  renderCalorieChart(recent, goals);
-  renderMacroGramChart(recent, goals);
+  renderTodayProgress(recent, targets);
+  renderCalorieChart(recent, targets);
+  renderMacroGramChart(recent, targets);
   renderMacroHistory(recent);
 }
 
-function renderTodayProgress(rows, goals) {
+function renderTodayProgress(rows, targets) {
   const today = todayISO();
   const todays = rows.filter(r => r.logged_at === today);
   const totals = todays.reduce((acc, r) => ({
@@ -365,10 +413,10 @@ function renderTodayProgress(rows, goals) {
   }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 });
 
   const bars = [
-    ['Calories', totals.calories, goals?.target_calories, ''],
-    ['Protein', totals.protein_g, goals?.target_protein_g, 'g'],
-    ['Carbs', totals.carbs_g, goals?.target_carbs_g, 'g'],
-    ['Fat', totals.fat_g, goals?.target_fat_g, 'g'],
+    ['Calories', totals.calories, targets?.target_calories, ''],
+    ['Protein', totals.protein_g, targets?.target_protein_g, 'g'],
+    ['Carbs', totals.carbs_g, targets?.target_carbs_g, 'g'],
+    ['Fat', totals.fat_g, targets?.target_fat_g, 'g'],
   ];
 
   const el = document.getElementById('mToday');
@@ -382,10 +430,10 @@ function renderTodayProgress(rows, goals) {
         <div class="progress-track"><div class="progress-fill${over ? ' over' : ''}" style="width:${target ? pct : 0}%"></div></div>
       </div>
     `;
-  }).join('') || '<div class="empty-note">Set targets on the Goals page.</div>';
+  }).join('') || '<div class="empty-note">Set targets on the Targets page.</div>';
 }
 
-function renderCalorieChart(rows, goals) {
+function renderCalorieChart(rows, targets) {
   const byDay = {};
   rows.forEach(r => {
     byDay[r.logged_at] = (byDay[r.logged_at] || 0) + Number(r.calories || 0);
@@ -403,8 +451,8 @@ function renderCalorieChart(rows, goals) {
     fill: true,
     pointRadius: 2,
   }];
-  if (goals?.target_calories) {
-    datasets.push(goalLineDataset('Goal', days.length, goals.target_calories));
+  if (targets?.target_calories) {
+    datasets.push(targetLineDataset('Target', days.length, targets.target_calories));
   }
 
   const ctx = document.getElementById('mChart').getContext('2d');
@@ -424,7 +472,7 @@ function renderCalorieChart(rows, goals) {
   });
 }
 
-function renderMacroGramChart(rows, goals) {
+function renderMacroGramChart(rows, targets) {
   const byDay = {};
   rows.forEach(r => {
     if (!byDay[r.logged_at]) byDay[r.logged_at] = { protein_g: 0, carbs_g: 0, fat_g: 0 };
@@ -442,7 +490,7 @@ function renderMacroGramChart(rows, goals) {
   ];
 
   const datasets = [];
-  series.forEach(([label, key, color, goalKey]) => {
+  series.forEach(([label, key, color, targetKey]) => {
     datasets.push({
       label,
       data: days.map(d => byDay[d][key]),
@@ -451,9 +499,9 @@ function renderMacroGramChart(rows, goals) {
       tension: 0.25,
       pointRadius: 2,
     });
-    // Goal lines start hidden (toggle via legend) — 6 lines at once was too busy.
-    if (goals?.[goalKey]) {
-      datasets.push(goalLineDataset(`${label} goal`, days.length, goals[goalKey], true));
+    // Target lines start hidden (toggle via legend) — 6 lines at once was too busy.
+    if (targets?.[targetKey]) {
+      datasets.push(targetLineDataset(`${label} target`, days.length, targets[targetKey], true));
     }
   });
 
@@ -498,9 +546,10 @@ function renderMacroHistory(rows) {
       <td>${r.calories} cal · ${r.protein_g}p / ${r.carbs_g}c / ${r.fat_g}f</td>
       <td>
         <div class="row-actions">
-          <button class="btn-secondary" onclick="copyMacro('${r.id}')">Copy</button>
-          <button class="btn-secondary" onclick="editMacro('${r.id}')">Edit</button>
-          <button class="btn-danger" onclick="deleteMacro('${r.id}')">Delete</button>
+          <button class="icon-btn" title="Add to common foods" onclick="addHistoryToCommonFoods('${r.id}')">${ICON_PLUS}</button>
+          <button class="icon-btn" title="Copy as new entry" onclick="copyMacro('${r.id}')">${ICON_COPY}</button>
+          <button class="icon-btn" title="Edit" onclick="editMacro('${r.id}')">${ICON_EDIT}</button>
+          <button class="icon-btn icon-btn-danger" title="Delete" onclick="deleteMacro('${r.id}')">${ICON_TRASH}</button>
         </div>
       </td>
     </tr>

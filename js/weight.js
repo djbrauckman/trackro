@@ -102,7 +102,7 @@ function renderWeightHistory(rows) {
       <td>${formatDateShort(r.logged_at)}</td>
       <td>${r.weight_lbs}</td>
       <td>${escapeHtml(r.notes)}</td>
-      <td><button class="btn-danger" onclick="deleteWeight('${r.id}')">Delete</button></td>
+      <td><button class="icon-btn icon-btn-danger" title="Delete" onclick="deleteWeight('${r.id}')">${ICON_TRASH}</button></td>
     </tr>
   `).join('');
 

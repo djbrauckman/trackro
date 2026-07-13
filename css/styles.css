@@ -45,6 +45,7 @@ body {
 
 /* ── Nav ── */
 .nav-link {
+  display: inline-flex; align-items: center; gap: 6px;
   padding: 7px 16px;
   border-radius: var(--radius-md);
   font-size: 13px; font-weight: 500;
@@ -55,6 +56,8 @@ body {
 }
 .nav-link:hover { background: var(--surface); color: var(--text); border-color: var(--border); }
 .nav-link--active { background: var(--surface); color: var(--text); border-color: var(--border-mid); }
+.nav-icon { display: inline-flex; }
+.nav-icon svg { width: 15px; height: 15px; }
 
 /* ── Header ── */
 .app-header { margin-bottom: 2.25rem; }
@@ -231,6 +234,18 @@ table.history-table tr.group-start:first-child td { border-top: none; }
 }
 .btn-tiny:hover { background: var(--surface-2); color: var(--text); }
 .row-actions { display: flex; gap: 6px; }
+
+.icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0;
+  background: var(--surface); color: var(--text-muted);
+  border: 1px solid var(--border-mid); border-radius: var(--radius-sm);
+  cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.icon-btn svg { width: 14px; height: 14px; }
+.icon-btn:hover { background: var(--surface-2); color: var(--text); border-color: #A09A92; }
+.icon-btn-danger { color: var(--red); border-color: var(--red-border); }
+.icon-btn-danger:hover { background: var(--red-bg); color: var(--red); }
 
 /* ── Chart containers ── */
 .chart-wrap { position: relative; height: 220px; margin-bottom: 4px; }
