@@ -42,8 +42,12 @@ create table if not exists exercise_items (
   sets integer,
   reps integer,
   load_lbs numeric,
+  notes text,
   created_at timestamptz not null default now()
 );
+
+-- Adds the column for installs that already ran the table creation above.
+alter table exercise_items add column if not exists notes text;
 
 create table if not exists macro_entries (
   id uuid primary key default gen_random_uuid(),

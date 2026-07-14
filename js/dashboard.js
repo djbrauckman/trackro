@@ -7,6 +7,7 @@ let dWeightChartInstance = null;
 let dCalorieChartInstance = null;
 let dMacroChartInstance = null;
 const EXERCISE_CATEGORIES = ['cardio', 'lifting', 'core'];
+const CATEGORY_LABELS = { cardio: 'Cardio', lifting: 'Lift', core: 'Core' };
 
 const TARGET_LINE_COLOR = '#7A7672';
 function targetLineDataset(label, count, value, hidden) {
@@ -237,7 +238,7 @@ function renderExerciseCounts(rows) {
     if (counts[r.category] != null) counts[r.category]++;
   });
 
-  const tiles = EXERCISE_CATEGORIES.map(cat => [cat.charAt(0).toUpperCase() + cat.slice(1), counts[cat]]);
+  const tiles = EXERCISE_CATEGORIES.map(cat => [CATEGORY_LABELS[cat], counts[cat]]);
   tiles.push(['Total', rows.length]);
 
   document.getElementById('dExerciseCounts').innerHTML = tiles.map(([label, value]) => `

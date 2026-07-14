@@ -220,11 +220,32 @@ table.history-table tr.group-start:first-child td { border-top: none; }
 .history-subhead-row {
   display: flex; justify-content: space-between; align-items: center;
   margin: 20px 0 8px;
+  cursor: pointer; user-select: none;
 }
 .history-subhead-row:first-child { margin-top: 0; }
 .history-subhead {
+  display: flex; align-items: center; gap: 6px;
   font-size: 12px; font-weight: 600; color: var(--text-muted);
   text-transform: uppercase; letter-spacing: 0.06em;
+}
+.history-subhead-meta {
+  font-size: 11px; font-weight: 400; color: var(--text-faint);
+  text-transform: none; letter-spacing: normal;
+}
+
+/* ── Collapsible sections (history grids, day groups, common foods) ── */
+.collapsible-chevron {
+  display: inline-flex; flex-shrink: 0; color: var(--text-faint);
+  transition: transform 0.15s;
+}
+.collapsible-chevron svg { width: 12px; height: 12px; }
+.collapsible-chevron.open { transform: rotate(90deg); }
+.collapsible-body { display: none; }
+.collapsible-body.open { display: block; }
+
+.cell-note {
+  font-size: 11px; color: var(--text-muted);
+  margin-top: 2px;
 }
 .btn-tiny {
   background: var(--surface); color: var(--text-muted);

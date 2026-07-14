@@ -83,35 +83,42 @@
     </div>
 
     <div class="card">
-      <h2>Common foods</h2>
-      <div class="empty-note" style="margin-top:-4px;">Save foods you eat often (macros per unit), then pick them from the Food field above to auto-fill.</div>
-      <div style="margin-bottom:16px">
-        <div class="label">Name</div>
-        <input type="text" id="cfName" placeholder="e.g. Egg (1 large)" />
+      <div class="history-subhead-row" style="margin:0" onclick="toggleCommonFoodsCard()">
+        <h2 style="display:flex; align-items:center; gap:6px; margin:0">
+          <span class="collapsible-chevron" id="cfCardChevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
+          Common foods
+        </h2>
       </div>
-      <div class="input-row-3">
-        <div>
-          <div class="label">Calories</div>
-          <input type="number" id="cfCalories" step="1" />
+      <div class="collapsible-body" id="cfCardBody">
+        <div class="empty-note" style="margin-top:12px;">Save foods you eat often (macros per unit), then pick them from the Food field above to auto-fill.</div>
+        <div style="margin-bottom:16px">
+          <div class="label">Name</div>
+          <input type="text" id="cfName" placeholder="e.g. Egg (1 large)" />
         </div>
-        <div>
-          <div class="label">Protein (g)</div>
-          <input type="number" id="cfProtein" step="1" />
+        <div class="input-row-3">
+          <div>
+            <div class="label">Calories</div>
+            <input type="number" id="cfCalories" step="1" />
+          </div>
+          <div>
+            <div class="label">Protein (g)</div>
+            <input type="number" id="cfProtein" step="1" />
+          </div>
+          <div>
+            <div class="label">Carbs (g)</div>
+            <input type="number" id="cfCarbs" step="1" />
+          </div>
         </div>
-        <div>
-          <div class="label">Carbs (g)</div>
-          <input type="number" id="cfCarbs" step="1" />
+        <div style="max-width: calc(33.33% - 10px); margin-bottom:16px">
+          <div class="label">Fat (g)</div>
+          <input type="number" id="cfFat" step="1" />
         </div>
+        <div class="btn-row" style="margin-top:0">
+          <button class="btn-secondary" id="cfAdd">Add to dictionary</button>
+        </div>
+        <div class="lock-error" id="cfError"></div>
+        <div id="cfList" style="margin-top:16px"><div class="empty-note">Loading...</div></div>
       </div>
-      <div style="max-width: calc(33.33% - 10px); margin-bottom:16px">
-        <div class="label">Fat (g)</div>
-        <input type="number" id="cfFat" step="1" />
-      </div>
-      <div class="btn-row" style="margin-top:0">
-        <button class="btn-secondary" id="cfAdd">Add to dictionary</button>
-      </div>
-      <div class="lock-error" id="cfError"></div>
-      <div id="cfList" style="margin-top:16px"><div class="empty-note">Loading...</div></div>
     </div>
   </div>
 

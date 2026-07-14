@@ -5,6 +5,9 @@
 let editingExerciseId = null;
 let exerciseRows = [];
 let exerciseItemsByEntry = {};
+let openExerciseSections = new Set();
+
+const CATEGORY_LABELS = { cardio: 'Cardio', lifting: 'Lift', core: 'Core' };
 
 document.addEventListener('DOMContentLoaded', () => {
   initNav('exercise');
@@ -96,6 +99,10 @@ function exerciseRowEl() {
         <input type="number" class="ex-load" step="0.5" />
       </div>
     </div>
+    <div style="margin-bottom:16px">
+      <div class="label">Notes (optional)</div>
+      <input type="text" class="ex-item-notes" placeholder="e.g. felt strong, used cambered bar" />
+    </div>
   `;
   return div;
 }
@@ -180,6 +187,7 @@ async function submitExercise() {
         sets: numOrNullFromEl(row.querySelector('.ex-sets')),
         reps: numOrNullFromEl(row.querySelector('.ex-reps')),
         load_lbs: numOrNullFromEl(row.querySelector('.ex-load')),
+        notes: row.querySelector('.ex-item-notes').value.trim() || null,
       });
     });
 
@@ -258,6 +266,7 @@ function editExercise(id) {
         row.querySelector('.ex-sets').value = it.sets ?? '';
         row.querySelector('.ex-reps').value = it.reps ?? '';
         row.querySelector('.ex-load').value = it.load_lbs ?? '';
+        row.querySelector('.ex-item-notes').value = it.notes ?? '';
         container.appendChild(row);
       });
     } else {
@@ -329,12 +338,18 @@ function renderExerciseCounts(rows) {
     if (counts[r.category] != null) counts[r.category]++;
   });
 
-  const tiles = EXERCISE_CATEGORIES.map(cat => [cat.charAt(0).toUpperCase() + cat.slice(1), counts[cat]]);
+  const tiles = EXERCISE_CATEGORIES.map(cat => [CATEGORY_LABELS[cat], counts[cat]]);
   tiles.push(['Total', rows.length]);
 
   document.getElementById('eCounts').innerHTML = tiles.map(([label, value]) => `
     <div class="stat-chip"><span>${value}</span>${label}</div>
   `).join('');
+}
+
+function toggleExerciseSection(key) {
+  if (openExerciseSections.has(key)) openExerciseSections.delete(key);
+  else openExerciseSections.add(key);
+  renderExerciseHistory(exerciseRows);
 }
 
 function renderExerciseHistory(rows) {
@@ -346,8 +361,8 @@ function renderExerciseHistory(rows) {
 
   const grids = [
     renderCardioGrid(rows.filter(r => r.category === 'cardio')),
-    renderStrengthGrid(rows.filter(r => r.category === 'lifting'), 'Lifting'),
-    renderStrengthGrid(rows.filter(r => r.category === 'core'), 'Core'),
+    renderStrengthGrid(rows.filter(r => r.category === 'lifting'), 'lifting'),
+    renderStrengthGrid(rows.filter(r => r.category === 'core'), 'core'),
   ].filter(Boolean);
 
   historyEl.innerHTML = grids.join('') || '<div class="empty-note">No entries yet.</div>';
@@ -355,6 +370,8 @@ function renderExerciseHistory(rows) {
 
 function renderCardioGrid(rows) {
   if (!rows.length) return '';
+
+  const isOpen = openExerciseSections.has('cardio');
 
   const durationCell = (r) => r.duration_min ? formatMinutesSeconds(r.duration_min) : '—';
   const distanceCell = (r) => r.distance_mi ? `${r.distance_mi} mi` : '—';
@@ -380,37 +397,45 @@ function renderCardioGrid(rows) {
   `).join('');
 
   return `
-    <div class="history-subhead-row">
-      <h3 class="history-subhead">Cardio</h3>
-      <button class="btn-tiny" onclick="exportCardioCSV()">Export CSV</button>
+    <div class="history-subhead-row" onclick="toggleExerciseSection('cardio')">
+      <h3 class="history-subhead">
+        <span class="collapsible-chevron${isOpen ? ' open' : ''}">${ICON_CHEVRON}</span>
+        Cardio <span class="history-subhead-meta">(${rows.length})</span>
+      </h3>
+      <button class="btn-tiny" onclick="event.stopPropagation(); exportCardioCSV()">Export CSV</button>
     </div>
-    <div class="table-scroll">
-      <table class="history-table">
-        <thead>
-          <tr><th>Date</th><th>Title</th><th>Duration</th><th>Distance</th><th>Pace</th><th>Cal</th><th>Notes</th><th></th></tr>
-        </thead>
-        <tbody>${rowsHtml}</tbody>
-      </table>
+    <div class="collapsible-body${isOpen ? ' open' : ''}">
+      <div class="table-scroll">
+        <table class="history-table">
+          <thead>
+            <tr><th>Date</th><th>Title</th><th>Duration</th><th>Distance</th><th>Pace</th><th>Cal</th><th>Notes</th><th></th></tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
     </div>
   `;
 }
 
 // Renders one row per exercise item; legacy entries saved before exercise_items
 // existed fall back to their old serialized `details` text as a single line.
-function renderStrengthGrid(rows, label) {
+function renderStrengthGrid(rows, category) {
   if (!rows.length) return '';
+
+  const isOpen = openExerciseSections.has(category);
+  const label = CATEGORY_LABELS[category];
 
   const rowsHtml = rows.slice(0, 40).flatMap(r => {
     const entryItems = exerciseItemsByEntry[r.id];
     const lines = entryItems && entryItems.length
-      ? entryItems.map(it => [it.name, it.sets, it.reps, it.load_lbs])
-      : [[r.details || '—', null, null, null]];
+      ? entryItems.map(it => [it.name, it.sets, it.reps, it.load_lbs, it.notes])
+      : [[r.details || '—', null, null, null, null]];
 
-    return lines.map(([name, sets, reps, load], idx) => `
+    return lines.map(([name, sets, reps, load, note], idx) => `
       <tr${idx === 0 ? ' class="group-start"' : ''}>
         <td>${idx === 0 ? formatDateShort(r.logged_at) : ''}</td>
         <td>${idx === 0 ? escapeHtml(r.exercise_name) : ''}</td>
-        <td>${escapeHtml(name)}</td>
+        <td>${escapeHtml(name)}${note ? `<div class="cell-note">${escapeHtml(note)}</div>` : ''}</td>
         <td>${sets ?? '—'}</td>
         <td>${reps ?? '—'}</td>
         <td>${load ? `${load} lbs` : '—'}</td>
@@ -428,17 +453,22 @@ function renderStrengthGrid(rows, label) {
   }).join('');
 
   return `
-    <div class="history-subhead-row">
-      <h3 class="history-subhead">${escapeHtml(label)}</h3>
-      <button class="btn-tiny" onclick="exportStrengthCSV('${label.toLowerCase()}')">Export CSV</button>
+    <div class="history-subhead-row" onclick="toggleExerciseSection('${category}')">
+      <h3 class="history-subhead">
+        <span class="collapsible-chevron${isOpen ? ' open' : ''}">${ICON_CHEVRON}</span>
+        ${escapeHtml(label)} <span class="history-subhead-meta">(${rows.length})</span>
+      </h3>
+      <button class="btn-tiny" onclick="event.stopPropagation(); exportStrengthCSV('${category}')">Export CSV</button>
     </div>
-    <div class="table-scroll">
-      <table class="history-table">
-        <thead>
-          <tr><th>Date</th><th>Title</th><th>Exercise</th><th>Sets</th><th>Reps</th><th>Load</th><th>Duration</th><th>Cal</th><th>Notes</th><th></th></tr>
-        </thead>
-        <tbody>${rowsHtml}</tbody>
-      </table>
+    <div class="collapsible-body${isOpen ? ' open' : ''}">
+      <div class="table-scroll">
+        <table class="history-table">
+          <thead>
+            <tr><th>Date</th><th>Title</th><th>Exercise</th><th>Sets</th><th>Reps</th><th>Load</th><th>Duration</th><th>Cal</th><th>Notes</th><th></th></tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
     </div>
   `;
 }
@@ -486,14 +516,14 @@ async function exportStrengthCSV(category) {
     (itemsByEntry[it.exercise_entry_id] = itemsByEntry[it.exercise_entry_id] || []).push(it);
   });
 
-  const rows = [['Date', 'Title', 'Exercise', 'Sets', 'Reps', 'Load (lbs)', 'Duration', 'Calories', 'Notes']];
+  const rows = [['Date', 'Title', 'Exercise', 'Sets', 'Reps', 'Load (lbs)', 'Exercise Notes', 'Duration', 'Calories', 'Workout Notes']];
   entries.forEach(r => {
     const entryItems = itemsByEntry[r.id];
     const lines = entryItems && entryItems.length
-      ? entryItems.map(it => [it.name, it.sets ?? '', it.reps ?? '', it.load_lbs ?? ''])
-      : [[r.details || '', '', '', '']];
+      ? entryItems.map(it => [it.name, it.sets ?? '', it.reps ?? '', it.load_lbs ?? '', it.notes ?? ''])
+      : [[r.details || '', '', '', '', '']];
 
-    lines.forEach(([name, sets, reps, load]) => {
+    lines.forEach(([name, sets, reps, load, notes]) => {
       rows.push([
         r.logged_at,
         r.exercise_name,
@@ -501,6 +531,7 @@ async function exportStrengthCSV(category) {
         sets,
         reps,
         load,
+        notes,
         r.duration_min ? formatMinutesSeconds(r.duration_min) : '',
         r.calories_burned ?? '',
         r.notes ?? '',

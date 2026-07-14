@@ -302,6 +302,12 @@ function toggleCommonFoods() {
   renderCommonFoodsList();
 }
 
+// Collapses the whole card (add form + list), not just the list pagination.
+function toggleCommonFoodsCard() {
+  document.getElementById('cfCardChevron').classList.toggle('open');
+  document.getElementById('cfCardBody').classList.toggle('open');
+}
+
 function renderCommonFoodsList() {
   const listEl = document.getElementById('cfList');
   if (!commonFoods.length) {
@@ -522,10 +528,17 @@ function renderMacroGramChart(rows, targets) {
   });
 }
 
-const MACRO_HISTORY_PAGE_SIZE = 10;
+const MACRO_DAYS_PAGE_SIZE = 7;
+let openMacroDays = new Set();
 
 function toggleMacroHistory() {
   macroHistoryExpanded = !macroHistoryExpanded;
+  renderMacroHistory(macroRows);
+}
+
+function toggleMacroDay(day) {
+  if (openMacroDays.has(day)) openMacroDays.delete(day);
+  else openMacroDays.add(day);
   renderMacroHistory(macroRows);
 }
 
@@ -536,38 +549,57 @@ function renderMacroHistory(rows) {
     return;
   }
 
-  const visibleRows = macroHistoryExpanded ? rows : rows.slice(0, MACRO_HISTORY_PAGE_SIZE);
+  const byDay = {};
+  rows.forEach(r => {
+    (byDay[r.logged_at] = byDay[r.logged_at] || []).push(r);
+  });
+  const days = Object.keys(byDay).sort((a, b) => b.localeCompare(a));
+  const visibleDays = macroHistoryExpanded ? days : days.slice(0, MACRO_DAYS_PAGE_SIZE);
 
-  const rowsHtml = visibleRows.map(r => `
-    <tr>
-      <td>${formatDateShort(r.logged_at)}</td>
-      <td>${escapeHtml(r.meal_name)}</td>
-      <td>${escapeHtml(r.food_name)}</td>
-      <td>${r.calories} cal · ${r.protein_g}p / ${r.carbs_g}c / ${r.fat_g}f</td>
-      <td>
-        <div class="row-actions">
-          <button class="icon-btn" title="Add to common foods" onclick="addHistoryToCommonFoods('${r.id}')">${ICON_PLUS}</button>
-          <button class="icon-btn" title="Copy as new entry" onclick="copyMacro('${r.id}')">${ICON_COPY}</button>
-          <button class="icon-btn" title="Edit" onclick="editMacro('${r.id}')">${ICON_EDIT}</button>
-          <button class="icon-btn icon-btn-danger" title="Delete" onclick="deleteMacro('${r.id}')">${ICON_TRASH}</button>
-        </div>
-      </td>
-    </tr>
-  `).join('');
+  const dayHtml = visibleDays.map(day => {
+    const dayRows = byDay[day];
+    const dayCalories = dayRows.reduce((sum, r) => sum + Number(r.calories || 0), 0);
+    const isOpen = openMacroDays.has(day);
 
-  const toggleHtml = rows.length > MACRO_HISTORY_PAGE_SIZE
+    const rowsHtml = dayRows.map(r => `
+      <tr>
+        <td>${escapeHtml(r.meal_name)}</td>
+        <td>${escapeHtml(r.food_name)}</td>
+        <td>${r.calories} cal · ${r.protein_g}p / ${r.carbs_g}c / ${r.fat_g}f</td>
+        <td>
+          <div class="row-actions">
+            <button class="icon-btn" title="Add to common foods" onclick="addHistoryToCommonFoods('${r.id}')">${ICON_PLUS}</button>
+            <button class="icon-btn" title="Copy as new entry" onclick="copyMacro('${r.id}')">${ICON_COPY}</button>
+            <button class="icon-btn" title="Edit" onclick="editMacro('${r.id}')">${ICON_EDIT}</button>
+            <button class="icon-btn icon-btn-danger" title="Delete" onclick="deleteMacro('${r.id}')">${ICON_TRASH}</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+
+    return `
+      <div class="history-subhead-row" onclick="toggleMacroDay('${day}')">
+        <h3 class="history-subhead">
+          <span class="collapsible-chevron${isOpen ? ' open' : ''}">${ICON_CHEVRON}</span>
+          ${formatDateShort(day)} <span class="history-subhead-meta">(${dayRows.length} · ${dayCalories} cal)</span>
+        </h3>
+      </div>
+      <div class="collapsible-body${isOpen ? ' open' : ''}">
+        <table class="history-table">
+          <thead><tr><th>Meal</th><th>Food</th><th>Macros</th><th></th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+    `;
+  }).join('');
+
+  const toggleHtml = days.length > MACRO_DAYS_PAGE_SIZE
     ? `<div class="btn-row" style="margin-top:12px">
          <button class="btn-tiny" onclick="toggleMacroHistory()">
-           ${macroHistoryExpanded ? 'Show fewer' : `Show all ${rows.length}`}
+           ${macroHistoryExpanded ? 'Show fewer days' : `Show all ${days.length} days`}
          </button>
        </div>`
     : '';
 
-  historyEl.innerHTML = `
-    <table class="history-table">
-      <thead><tr><th>Date</th><th>Meal</th><th>Food</th><th>Macros</th><th></th></tr></thead>
-      <tbody>${rowsHtml}</tbody>
-    </table>
-    ${toggleHtml}
-  `;
+  historyEl.innerHTML = dayHtml + toggleHtml;
 }
