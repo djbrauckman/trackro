@@ -157,7 +157,6 @@ async function submitExercise() {
     exercise_name,
     category,
     duration_min,
-    calories_burned: numOrNull('eCalories'),
     notes: document.getElementById('eNotes').value.trim() || null,
     sets: null,
     reps: null,
@@ -228,7 +227,7 @@ async function submitExercise() {
 
   editingExerciseId = null;
   setExerciseFormMode('add');
-  ['eName', 'eDuration', 'eDistance', 'ePace', 'eCalories', 'eNotes'].forEach(id => {
+  ['eName', 'eDuration', 'eDistance', 'ePace', 'eNotes'].forEach(id => {
     document.getElementById(id).value = '';
   });
   resetExerciseRows();
@@ -245,7 +244,6 @@ function editExercise(id) {
   document.getElementById('eCategory').value = r.category;
   document.getElementById('eName').value = r.exercise_name;
   document.getElementById('eDuration').value = r.duration_min ? formatMinutesSeconds(r.duration_min) : '';
-  document.getElementById('eCalories').value = r.calories_burned ?? '';
   document.getElementById('eNotes').value = r.notes ?? '';
 
   updateCategoryFields();
@@ -284,7 +282,7 @@ function cancelExerciseEdit() {
   document.getElementById('eDate').value = todayISO();
   document.getElementById('eCategory').value = 'cardio';
   updateCategoryFields();
-  ['eName', 'eDuration', 'eDistance', 'ePace', 'eCalories', 'eNotes'].forEach(id => {
+  ['eName', 'eDuration', 'eDistance', 'ePace', 'eNotes'].forEach(id => {
     document.getElementById(id).value = '';
   });
   resetExerciseRows();
@@ -376,7 +374,6 @@ function renderCardioGrid(rows) {
   const durationCell = (r) => r.duration_min ? formatMinutesSeconds(r.duration_min) : '—';
   const distanceCell = (r) => r.distance_mi ? `${r.distance_mi} mi` : '—';
   const paceCell = (r) => r.pace_sec_per_mi ? `${formatMinutesSeconds(r.pace_sec_per_mi / 60)}/mi` : '—';
-  const caloriesCell = (r) => r.calories_burned ? `${r.calories_burned}` : '—';
 
   const rowsHtml = rows.slice(0, 40).map(r => `
     <tr>
@@ -385,7 +382,6 @@ function renderCardioGrid(rows) {
       <td>${durationCell(r)}</td>
       <td>${distanceCell(r)}</td>
       <td>${paceCell(r)}</td>
-      <td>${caloriesCell(r)}</td>
       <td>${r.notes ? escapeHtml(r.notes) : '—'}</td>
       <td>
         <div class="row-actions">
@@ -408,7 +404,7 @@ function renderCardioGrid(rows) {
       <div class="table-scroll">
         <table class="history-table">
           <thead>
-            <tr><th>Date</th><th>Title</th><th>Duration</th><th>Distance</th><th>Pace</th><th>Cal</th><th>Notes</th><th></th></tr>
+            <tr><th>Date</th><th>Title</th><th>Duration</th><th>Distance</th><th>Pace</th><th>Notes</th><th></th></tr>
           </thead>
           <tbody>${rowsHtml}</tbody>
         </table>
@@ -440,7 +436,6 @@ function renderStrengthGrid(rows, category) {
         <td>${reps ?? '—'}</td>
         <td>${load ? `${load} lbs` : '—'}</td>
         <td>${idx === 0 ? (r.duration_min ? formatMinutesSeconds(r.duration_min) : '—') : ''}</td>
-        <td>${idx === 0 ? (r.calories_burned ? r.calories_burned : '—') : ''}</td>
         <td>${idx === 0 ? (r.notes ? escapeHtml(r.notes) : '—') : ''}</td>
         <td>${idx === 0 ? `
           <div class="row-actions">
@@ -464,7 +459,7 @@ function renderStrengthGrid(rows, category) {
       <div class="table-scroll">
         <table class="history-table">
           <thead>
-            <tr><th>Date</th><th>Title</th><th>Exercise</th><th>Sets</th><th>Reps</th><th>Load</th><th>Duration</th><th>Cal</th><th>Notes</th><th></th></tr>
+            <tr><th>Date</th><th>Title</th><th>Exercise</th><th>Sets</th><th>Reps</th><th>Load</th><th>Duration</th><th>Notes</th><th></th></tr>
           </thead>
           <tbody>${rowsHtml}</tbody>
         </table>
@@ -481,7 +476,7 @@ async function exportCardioCSV() {
     .order('logged_at', { ascending: true });
   if (error || !data || !data.length) return;
 
-  const rows = [['Date', 'Title', 'Duration', 'Distance (mi)', 'Pace (min/mi)', 'Calories', 'Notes']];
+  const rows = [['Date', 'Title', 'Duration', 'Distance (mi)', 'Pace (min/mi)', 'Notes']];
   data.forEach(r => {
     rows.push([
       r.logged_at,
@@ -489,7 +484,6 @@ async function exportCardioCSV() {
       r.duration_min ? formatMinutesSeconds(r.duration_min) : '',
       r.distance_mi ?? '',
       r.pace_sec_per_mi ? formatMinutesSeconds(r.pace_sec_per_mi / 60) : '',
-      r.calories_burned ?? '',
       r.notes ?? '',
     ]);
   });
@@ -516,7 +510,7 @@ async function exportStrengthCSV(category) {
     (itemsByEntry[it.exercise_entry_id] = itemsByEntry[it.exercise_entry_id] || []).push(it);
   });
 
-  const rows = [['Date', 'Title', 'Exercise', 'Sets', 'Reps', 'Load (lbs)', 'Exercise Notes', 'Duration', 'Calories', 'Workout Notes']];
+  const rows = [['Date', 'Title', 'Exercise', 'Sets', 'Reps', 'Load (lbs)', 'Exercise Notes', 'Duration', 'Workout Notes']];
   entries.forEach(r => {
     const entryItems = itemsByEntry[r.id];
     const lines = entryItems && entryItems.length
@@ -533,7 +527,6 @@ async function exportStrengthCSV(category) {
         load,
         notes,
         r.duration_min ? formatMinutesSeconds(r.duration_min) : '',
-        r.calories_burned ?? '',
         r.notes ?? '',
       ]);
     });

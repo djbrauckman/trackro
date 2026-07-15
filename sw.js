@@ -4,7 +4,7 @@
  * offline/on a flaky connection. Supabase/CDN requests are left untouched —
  * this is not an offline-data cache, just an offline-shell cache.
  */
-const CACHE_NAME = 'trackro-shell-v1';
+const CACHE_NAME = 'trackro-shell-v2';
 const SHELL_FILES = [
   'index.html',
   'weight.html',
@@ -17,14 +17,19 @@ const SHELL_FILES = [
   'js/utils.js',
   'js/nav.js',
   'js/gate.js',
+  'js/pwa.js',
   'js/dashboard.js',
   'js/weight.js',
   'js/exercise.js',
   'js/macros.js',
   'js/goals.js',
   'manifest.json',
+  'favicon.ico',
+  'icons/favicon-16.png',
+  'icons/favicon-32.png',
   'icons/icon-192.png',
   'icons/icon-512.png',
+  'icons/apple-touch-icon.png',
 ];
 
 self.addEventListener('install', (event) => {
