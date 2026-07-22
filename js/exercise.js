@@ -95,7 +95,7 @@ function exerciseRowEl() {
         <input type="number" class="ex-reps" step="1" />
       </div>
       <div>
-        <div class="label">Load (lbs)</div>
+        <div class="label">Load</div>
         <input type="number" class="ex-load" step="0.5" />
       </div>
     </div>
@@ -413,38 +413,56 @@ function renderCardioGrid(rows) {
   `;
 }
 
-// Renders one row per exercise item; legacy entries saved before exercise_items
-// existed fall back to their old serialized `details` text as a single line.
+// Renders one block per workout: a header row (date/title/duration/notes)
+// followed by a compact exercise/sets/reps/load table — keeps the item table
+// narrow instead of squeezing it alongside mostly-blank workout-level columns.
+// Legacy entries saved before exercise_items existed fall back to their old
+// serialized `details` text as a single line.
 function renderStrengthGrid(rows, category) {
   if (!rows.length) return '';
 
   const isOpen = openExerciseSections.has(category);
   const label = CATEGORY_LABELS[category];
 
-  const rowsHtml = rows.slice(0, 40).flatMap(r => {
+  const blocksHtml = rows.slice(0, 40).map(r => {
     const entryItems = exerciseItemsByEntry[r.id];
     const lines = entryItems && entryItems.length
       ? entryItems.map(it => [it.name, it.sets, it.reps, it.load_lbs, it.notes])
       : [[r.details || '—', null, null, null, null]];
 
-    return lines.map(([name, sets, reps, load, note], idx) => `
-      <tr${idx === 0 ? ' class="group-start"' : ''}>
-        <td>${idx === 0 ? formatDateShort(r.logged_at) : ''}</td>
-        <td>${idx === 0 ? escapeHtml(r.exercise_name) : ''}</td>
+    const itemsHtml = lines.map(([name, sets, reps, load, note]) => `
+      <tr>
         <td>${escapeHtml(name)}${note ? `<div class="cell-note">${escapeHtml(note)}</div>` : ''}</td>
         <td>${sets ?? '—'}</td>
         <td>${reps ?? '—'}</td>
-        <td>${load ? `${load} lbs` : '—'}</td>
-        <td>${idx === 0 ? (r.duration_min ? formatMinutesSeconds(r.duration_min) : '—') : ''}</td>
-        <td>${idx === 0 ? (r.notes ? escapeHtml(r.notes) : '—') : ''}</td>
-        <td>${idx === 0 ? `
+        <td>${load ?? '—'}</td>
+      </tr>
+    `).join('');
+
+    const duration = r.duration_min ? formatMinutesSeconds(r.duration_min) : '';
+
+    return `
+      <div class="workout-block">
+        <div class="workout-header">
+          <div class="workout-header-main">
+            <b>${formatDateShort(r.logged_at)}</b> · ${escapeHtml(r.exercise_name)}${duration ? ` · ${duration}` : ''}
+          </div>
           <div class="row-actions">
             <button class="icon-btn" title="Edit" onclick="editExercise('${r.id}')">${ICON_EDIT}</button>
             <button class="icon-btn icon-btn-danger" title="Delete" onclick="deleteExercise('${r.id}')">${ICON_TRASH}</button>
           </div>
-        ` : ''}</td>
-      </tr>
-    `).join('');
+        </div>
+        ${r.notes ? `<div class="workout-header-notes">${escapeHtml(r.notes)}</div>` : ''}
+        <div class="table-scroll">
+          <table class="history-table">
+            <thead>
+              <tr><th>Exercise</th><th>Sets</th><th>Reps</th><th>Load</th></tr>
+            </thead>
+            <tbody>${itemsHtml}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
   }).join('');
 
   return `
@@ -456,14 +474,7 @@ function renderStrengthGrid(rows, category) {
       <button class="btn-tiny" onclick="event.stopPropagation(); exportStrengthCSV('${category}')">Export CSV</button>
     </div>
     <div class="collapsible-body${isOpen ? ' open' : ''}">
-      <div class="table-scroll">
-        <table class="history-table">
-          <thead>
-            <tr><th>Date</th><th>Title</th><th>Exercise</th><th>Sets</th><th>Reps</th><th>Load</th><th>Duration</th><th>Notes</th><th></th></tr>
-          </thead>
-          <tbody>${rowsHtml}</tbody>
-        </table>
-      </div>
+      ${blocksHtml}
     </div>
   `;
 }
