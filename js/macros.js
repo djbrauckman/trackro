@@ -385,13 +385,17 @@ async function deleteCommonFood(id) {
 }
 
 async function loadMacroData() {
-  const [{ data: targets }, { data: recent, error }] = await Promise.all([
+  const [{ data: targets }, { data: recent, error }, { data: exercises }] = await Promise.all([
     supabaseClient.from('goals').select('*').eq('id', 1).single(),
     supabaseClient
       .from('macro_entries')
       .select('*')
       .gte('logged_at', daysAgoISO(30))
       .order('logged_at', { ascending: false }),
+    supabaseClient
+      .from('exercise_entries')
+      .select('logged_at, category')
+      .gte('logged_at', daysAgoISO(30)),
   ]);
 
   const historyEl = document.getElementById('mHistory');
@@ -403,7 +407,7 @@ async function loadMacroData() {
   macroRows = recent;
 
   renderTodayProgress(recent, targets);
-  renderCalorieChart(recent, targets);
+  renderCalorieChart(recent, targets, exercises || []);
   renderMacroGramChart(recent, targets);
   renderMacroHistory(recent);
 }
@@ -439,7 +443,7 @@ function renderTodayProgress(rows, targets) {
   }).join('') || '<div class="empty-note">Set targets on the Targets page.</div>';
 }
 
-function renderCalorieChart(rows, targets) {
+function renderCalorieChart(rows, targets, exercises) {
   const byDay = {};
   rows.forEach(r => {
     byDay[r.logged_at] = (byDay[r.logged_at] || 0) + Number(r.calories || 0);
@@ -447,6 +451,10 @@ function renderCalorieChart(rows, targets) {
   const days = Object.keys(byDay).sort();
   const labels = days.map(formatDateShort);
   const values = days.map(d => byDay[d]);
+  const dayActivity = buildDayActivity(exercises);
+
+  const CARDIO_COLOR = '#1B5EAB';
+  const STRENGTH_COLOR = '#0F7A6E';
 
   const datasets = [{
     label: 'Calories',
@@ -455,7 +463,20 @@ function renderCalorieChart(rows, targets) {
     backgroundColor: 'rgba(168,99,0,0.1)',
     tension: 0.25,
     fill: true,
-    pointRadius: 2,
+    pointStyle: (pctx) => {
+      const activity = dayActivity[days[pctx.dataIndex]];
+      if (activity?.cardio) return shoeIconCanvas(32, CARDIO_COLOR);
+      if (activity?.strength) return dumbbellIconCanvas(32, STRENGTH_COLOR);
+      return 'circle';
+    },
+    pointRadius: (pctx) => {
+      const activity = dayActivity[days[pctx.dataIndex]];
+      return (activity?.cardio || activity?.strength) ? 9 : 2;
+    },
+    pointHoverRadius: (pctx) => {
+      const activity = dayActivity[days[pctx.dataIndex]];
+      return (activity?.cardio || activity?.strength) ? 11 : 4;
+    },
   }];
   if (targets?.target_calories) {
     datasets.push(targetLineDataset('Target', days.length, targets.target_calories));
@@ -469,7 +490,20 @@ function renderCalorieChart(rows, targets) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: datasets.length > 1, labels: { boxWidth: 12, font: { size: 11 } } } },
+      plugins: {
+        legend: { display: datasets.length > 1, labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            afterLabel: (item) => {
+              if (item.datasetIndex !== 0) return '';
+              const activity = dayActivity[days[item.dataIndex]];
+              if (activity?.cardio) return 'Cardio day';
+              if (activity?.strength) return 'Lift/core day';
+              return '';
+            },
+          },
+        },
+      },
       scales: {
         y: { beginAtZero: true, ticks: { font: { size: 11 } } },
         x: { ticks: { font: { size: 10 } } },
