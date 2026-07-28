@@ -59,40 +59,22 @@ const ICON_EDIT = `<svg ${ICON_SVG_ATTRS}><path d="M12 20h9"/><path d="M16.5 3.5
 const ICON_TRASH = `<svg ${ICON_SVG_ATTRS}><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>`;
 const ICON_CHEVRON = `<svg ${ICON_SVG_ATTRS}><path d="M9 6l6 6-6 6"/></svg>`;
 
-// Small filled canvas icons used as Chart.js point markers (cardio/strength
-// day indicators on calorie trend charts). Chart.js draws image/canvas
-// pointStyle values directly, so these need to be actual canvases, not SVG.
-function iconCanvas(size, drawFn) {
+// Small filled canvas letter marker used as a Chart.js point style (cardio/
+// strength day indicators on calorie trend charts, plotted along the bottom
+// of the chart rather than on the calorie line itself). Chart.js draws
+// image/canvas pointStyle values directly, so this needs to be an actual
+// canvas, not SVG/text.
+function letterIconCanvas(letter, color, size = 14) {
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
-  drawFn(canvas.getContext('2d'), size);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = color;
+  ctx.font = `bold ${size * 0.8}px 'DM Sans', sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(letter, size / 2, size / 2 + size * 0.05);
   return canvas;
-}
-
-function dumbbellIconCanvas(size, color) {
-  return iconCanvas(size, (ctx, s) => {
-    ctx.fillStyle = color;
-    const plateW = s * 0.16, plateH = s * 0.5, plateY = s * 0.25;
-    ctx.fillRect(s * 0.04, plateY, plateW, plateH);
-    ctx.fillRect(s * 0.80, plateY, plateW, plateH);
-    ctx.fillRect(s * 0.20, s * 0.44, s * 0.60, s * 0.12);
-  });
-}
-
-function shoeIconCanvas(size, color) {
-  return iconCanvas(size, (ctx, s) => {
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(s * 0.06, s * 0.80);
-    ctx.bezierCurveTo(s * 0.02, s * 0.62, s * 0.10, s * 0.48, s * 0.26, s * 0.46);
-    ctx.lineTo(s * 0.48, s * 0.32);
-    ctx.bezierCurveTo(s * 0.60, s * 0.22, s * 0.78, s * 0.22, s * 0.88, s * 0.34);
-    ctx.bezierCurveTo(s * 0.96, s * 0.42, s * 0.94, s * 0.56, s * 0.86, s * 0.62);
-    ctx.lineTo(s * 0.90, s * 0.80);
-    ctx.closePath();
-    ctx.fill();
-  });
 }
 
 // Maps logged_at -> { cardio, strength } from a set of exercise_entries rows.

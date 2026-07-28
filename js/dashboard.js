@@ -156,29 +156,20 @@ function renderCalorieChart(rows, targets, exercises) {
   const CARDIO_COLOR = '#1B5EAB';
   const STRENGTH_COLOR = '#0F7A6E';
 
-  const datasets = [{
-    label: 'Calories',
-    data: values,
-    borderColor: '#A86300',
-    backgroundColor: 'rgba(168,99,0,0.1)',
-    tension: 0.25,
-    fill: true,
-    pointStyle: (pctx) => {
-      const activity = dayActivity[days[pctx.dataIndex]];
-      if (activity?.cardio) return shoeIconCanvas(32, CARDIO_COLOR);
-      if (activity?.strength) return dumbbellIconCanvas(32, STRENGTH_COLOR);
-      return 'circle';
+  const datasets = [
+    {
+      label: 'Calories',
+      data: values,
+      borderColor: '#A86300',
+      backgroundColor: 'rgba(168,99,0,0.1)',
+      tension: 0.25,
+      fill: true,
+      pointRadius: 2,
     },
-    pointRadius: (pctx) => {
-      const activity = dayActivity[days[pctx.dataIndex]];
-      return (activity?.cardio || activity?.strength) ? 9 : 2;
-    },
-    pointHoverRadius: (pctx) => {
-      const activity = dayActivity[days[pctx.dataIndex]];
-      return (activity?.cardio || activity?.strength) ? 11 : 4;
-    },
-  }];
-  if (targets?.target_calories) {
+    activityMarkerDataset(days, dayActivity, CARDIO_COLOR, STRENGTH_COLOR),
+  ];
+  const hasTarget = !!targets?.target_calories;
+  if (hasTarget) {
     datasets.push(targetLineDataset('Target', days.length, targets.target_calories));
   }
 
@@ -191,8 +182,9 @@ function renderCalorieChart(rows, targets, exercises) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: datasets.length > 1, labels: { boxWidth: 12, font: { size: 11 } } },
+        legend: { display: hasTarget, labels: { boxWidth: 12, font: { size: 11 }, filter: (item) => item.text !== 'Activity' } },
         tooltip: {
+          filter: (item) => item.datasetIndex !== 1,
           callbacks: {
             afterLabel: (item) => {
               if (item.datasetIndex !== 0) return '';
@@ -206,10 +198,37 @@ function renderCalorieChart(rows, targets, exercises) {
       },
       scales: {
         y: { beginAtZero: true, ticks: { font: { size: 11 } } },
+        yActivity: { display: false, min: -0.2, max: 1 },
         x: { ticks: { font: { size: 10 } } },
       },
     },
   });
+}
+
+// A row of small "R"/"L" letter markers pinned to the bottom of the chart
+// (via a hidden secondary axis) instead of replacing the calorie line's own
+// points — keeps the actual data line uncluttered.
+function activityMarkerDataset(days, dayActivity, cardioColor, strengthColor) {
+  return {
+    label: 'Activity',
+    yAxisID: 'yActivity',
+    data: days.map(() => 0),
+    showLine: false,
+    pointStyle: (pctx) => {
+      const activity = dayActivity[days[pctx.dataIndex]];
+      if (activity?.cardio) return letterIconCanvas('R', cardioColor);
+      if (activity?.strength) return letterIconCanvas('L', strengthColor);
+      return 'circle';
+    },
+    pointRadius: (pctx) => {
+      const activity = dayActivity[days[pctx.dataIndex]];
+      return (activity?.cardio || activity?.strength) ? 7 : 0;
+    },
+    pointHoverRadius: (pctx) => {
+      const activity = dayActivity[days[pctx.dataIndex]];
+      return (activity?.cardio || activity?.strength) ? 8 : 0;
+    },
+  };
 }
 
 function renderMacroGramChart(rows, targets) {
