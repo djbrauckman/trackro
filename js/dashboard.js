@@ -6,8 +6,15 @@
 let dWeightChartInstance = null;
 let dCalorieChartInstance = null;
 let dMacroChartInstance = null;
+let dRunGoalChartInstance = null;
 const EXERCISE_CATEGORIES = ['cardio', 'lifting', 'core'];
 const CATEGORY_LABELS = { cardio: 'Cardio', lifting: 'Lift', core: 'Core' };
+
+// Personal running goal — edit these to change the goal/window/weekly pace.
+const RUN_GOAL_START = '2026-08-01';
+const RUN_GOAL_END = '2026-12-31';
+const RUN_GOAL_MILES = 236;
+const RUN_GOAL_WEEKLY_TARGET = 12;
 
 const TARGET_LINE_COLOR = '#7A7672';
 function targetLineDataset(label, count, value, hidden) {
@@ -27,6 +34,7 @@ function targetLineDataset(label, count, value, hidden) {
 document.addEventListener('DOMContentLoaded', () => {
   initNav('dashboard');
   loadDashboard();
+  loadRunGoal();
 });
 
 function weekStartISO(isoDate) {
@@ -291,6 +299,69 @@ function renderExerciseCounts(rows) {
   tiles.push(['Total', rows.length]);
 
   document.getElementById('dExerciseCounts').innerHTML = tiles.map(([label, value]) => `
+    <div class="stat-chip"><span>${value}</span>${label}</div>
+  `).join('');
+}
+
+async function loadRunGoal() {
+  const { data: runs, error } = await supabaseClient
+    .from('exercise_entries')
+    .select('logged_at, distance_mi')
+    .eq('category', 'cardio')
+    .gte('logged_at', RUN_GOAL_START)
+    .lte('logged_at', RUN_GOAL_END);
+
+  if (error) return;
+
+  renderRunGoal(runs || []);
+}
+
+function renderRunGoal(runs) {
+  const milesSoFar = runs.reduce((sum, r) => sum + Number(r.distance_mi || 0), 0);
+  const remaining = Math.max(RUN_GOAL_MILES - milesSoFar, 0);
+  const pct = Math.min(100, (milesSoFar / RUN_GOAL_MILES) * 100);
+
+  document.getElementById('dRunGoalMiles').textContent = `${round1(milesSoFar)} mi`;
+  document.getElementById('dRunGoalPct').textContent = `${Math.round(pct)}% of ${RUN_GOAL_MILES} mi`;
+
+  const ctx = document.getElementById('dRunGoalChart').getContext('2d');
+  if (dRunGoalChartInstance) dRunGoalChartInstance.destroy();
+  dRunGoalChartInstance = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      datasets: [{
+        data: [milesSoFar, remaining],
+        backgroundColor: ['#0F7A6E', '#E2DED7'],
+        borderWidth: 0,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '78%',
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+    },
+  });
+
+  const today = todayISO();
+  const weekStart = weekStartISO(today);
+  const thisWeekMiles = runs
+    .filter(r => r.logged_at >= weekStart && r.logged_at <= today)
+    .reduce((sum, r) => sum + Number(r.distance_mi || 0), 0);
+
+  const endDate = new Date(RUN_GOAL_END + 'T00:00:00');
+  const now = new Date(today + 'T00:00:00');
+  const daysRemaining = Math.max(0, Math.ceil((endDate - now) / 86400000));
+  const weeksRemaining = daysRemaining / 7;
+  const paceNeeded = remaining > 0 && weeksRemaining > 0 ? remaining / weeksRemaining : 0;
+
+  const tiles = [
+    ['This week', `${round1(thisWeekMiles)} / ${RUN_GOAL_WEEKLY_TARGET} mi`],
+    ['Pace needed', remaining > 0 ? `${round1(paceNeeded)} mi/wk` : 'Goal met'],
+    ['Weeks left', `${Math.ceil(weeksRemaining)}`],
+  ];
+
+  document.getElementById('dRunGoalStats').innerHTML = tiles.map(([label, value]) => `
     <div class="stat-chip"><span>${value}</span>${label}</div>
   `).join('');
 }

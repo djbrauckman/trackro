@@ -284,6 +284,26 @@ table.history-table tr:last-child td { border-bottom: none; }
 /* ── Chart containers ── */
 .chart-wrap { position: relative; height: 220px; margin-bottom: 4px; }
 
+/* ── Progress wheel (running goal) ── */
+.progress-wheel-wrap {
+  position: relative;
+  width: 180px; height: 180px;
+  margin: 4px auto 16px;
+}
+.progress-wheel-center {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  pointer-events: none; text-align: center;
+}
+.progress-wheel-value {
+  font-family: 'DM Mono', monospace;
+  font-size: 26px; font-weight: 600; color: var(--text);
+  letter-spacing: -0.02em;
+}
+.progress-wheel-label {
+  font-size: 11px; color: var(--text-muted); margin-top: 4px;
+}
+
 /* ── Lock screen ── */
 #lock-screen {
   position: fixed; inset: 0; background: var(--bg);
